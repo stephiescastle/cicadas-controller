@@ -35,7 +35,7 @@ void setup() {
 void loop() {
   // read parameterKnobPins
   for (int i = 0; i < 3; i++) {
-    parameterKnobValues[i] = digitalRead(parameterKnobPins[i]);
+    parameterKnobValues[i] = map(analogRead(parameterKnobPins[i]), 0, 1023, 0, 255);
     Serial.print("parameterKnobValues[");
     Serial.print(i);
     Serial.print("] = ");
@@ -51,7 +51,7 @@ void loop() {
   }
   // read motorKnobPins 
   for (int i = 0; i < 12; i++) {
-    motorKnobValues[i] = digitalRead(motorKnobPins[i]);
+    motorKnobValues[i] =  map(analogRead(motorKnobPins[i]), 0, 1023, 0, 255);
     Serial.print("motorKnobValues[");
     Serial.print(i);
     Serial.print("] = ");
@@ -64,11 +64,22 @@ void loop() {
     Serial.print(i);
     Serial.print("] = ");
     Serial.println(motorToggleValues[i]);
-    // drive motor if switched on
-    if (motorToggleValues[i] = HIGH) {
-      analogWrite(motorDriverPins[i], motorKnobValues[i]);
+  }
+
+  // evaluate and do
+  for (int i = 0; i < 12; i++) {
+    if (motorToggleValues[i] == 1) {
+      // drive motor if switched on
+      if (parameterToggleValues[1] == 1) {
+        // if main board override, use main board knob for all
+        analogWrite(motorDriverPins[i], parameterKnobValues[0]);
+      } else {
+        analogWrite(motorDriverPins[i], motorKnobValues[i]);
+      }
     } else {
+      // off
       analogWrite(motorDriverPins[i], 0);
     }
   }
+
 }
