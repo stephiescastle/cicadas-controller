@@ -28,12 +28,15 @@ RBD::Motor motor[] = {(3), (5)};
   // ramp direction for each per motor
 bool rampingUp[] = {true, true}; 
   // ramp durations for each motor
-unsigned long rampTime[] = {1000, 1000};
+unsigned long rampTime[] = {1200, 1200};
   // create and set timer for each motor
 RBD::Timer rampTimer[] = {(rampTime[0]), rampTime[1]};
-  // easy var for array lengths
-int motorCount = 2;
-
+  // use in for loops
+static const uint8_t motorCount = 2;
+  // min motor ramp time
+int motorRampMin = 1000;
+  // max motor ramp time
+int motorRampMax = 2000;
 /* UTIL FUNCTIONS ------------------------------------------- */
 
 int motorSpeed() {
@@ -45,14 +48,30 @@ int motorSpeed() {
   }
 }
 
+// slightly change ramp time
+void randomizeRampTime(int i) {
+  int factor = random(76);
+  if (random(2) == 0) {
+    factor = factor *(-1);
+  }
+  rampTime[i] = constrain(rampTime[i] + factor, motorRampMin, motorRampMax);
+  Serial.print(i);
+  Serial.print(": ");
+  Serial.println(rampTime[i]);
+}
+
 /* SETUP ---------------------------------------------------- */
 
 void setup() {
-  Serial.begin(9600);
+  // TODO: change this pin number to an unused pin
+  randomSeed(analogRead(0));
+
   // start asleep
   // TODO: can a knob change this though?
   sleepTimer.setTimeout(sleepTime);
   sleepTimer.restart();
+
+  Serial.begin(9600);
 }
 
 /* LOOP ----------------------------------------------------- */
@@ -61,11 +80,11 @@ void loop() {
   // Serial.print("Speed: ");
   // Serial.println(motor[0].getSpeed());
 
-  // scale times
+  // TODO: scale times
   // awakeTimer = awakeTimer * scale;
   // sleepTimer = sleepTimer * scale;
   // rampTimer[] = rampTime * scale;
-
+ 
   if(sleepTimer.onExpired()) {
     Serial.println("SLEEP time expired");
 
@@ -76,9 +95,14 @@ void loop() {
     
     // start the awakeTime timer
     awakeTimer.restart();
-    
+
+    // randomizeRampTime()
+
     // start the rampUp timer for each motor
+    // TODO: this is too uniform. Need some kind of delay per motor?
     for (int i = 0; i < motorCount; i++) {
+      randomizeRampTime(i);
+
       rampingUp[i] = true;
       rampTimer[i].setTimeout(rampTime[i]);
       rampTimer[i].restart();
@@ -87,8 +111,10 @@ void loop() {
       motor[i].ramp(motorSpeed(), rampTime[i]);
     }    
   }
+  // randomizeRampTime()
   for (int i = 0; i < motorCount; i++) {
     if(rampTimer[i].onExpired()){
+      randomizeRampTime(i);
       // start the rampdown timer
       if (rampingUp[i]) {
         rampingUp[i] = false;
@@ -98,6 +124,7 @@ void loop() {
           motor[i].ramp(0, rampTime[i]);
         }
       } else {
+        randomizeRampTime(i);
         rampingUp[i] = true;
         rampTimer[i].restart();
         // ramp up the motor
@@ -113,7 +140,10 @@ void loop() {
     for (int i = 0; i < motorCount; i++) {
       // make sure it turns off
       rampingUp[i] = false;
-      rampTimer[i].restart();
+      // TODO: not working quite right. Let it finish a ramp up/down cycle, don't interrupt it
+      if (rampTimer[i].isExpired()) {
+        rampTimer[i].restart();
+      }
       motor[i].ramp(0, rampTime[i]);
     }
     // go to sleep
