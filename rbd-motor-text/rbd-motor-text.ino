@@ -12,15 +12,15 @@
 
 // Global Pod States
   // time scale
-int timeScale = 1;
+int timeScale = 1000;
   // sleep duration TODO: use timescale
-unsigned long sleepTime = 4000;
+unsigned long sleepTime = 4;
   // sleep timer
-RBD::Timer sleepTimer(sleepTime);
+RBD::Timer sleepTimer(sleepTime*timeScale);
   // awake duration TODO: use timescale
-unsigned long awakeTime = 12000;
+unsigned long awakeTime = 12;
   // awake timer
-RBD::Timer awakeTimer(awakeTime);
+RBD::Timer awakeTimer(awakeTime*timeScale);
   // if pod is awake or sleeping
 bool awake = false;
 
@@ -36,9 +36,9 @@ RBD::Timer rampTimer[] = {(rampTime[0]), rampTime[1]};
   // use in for loops
 static const uint8_t motorCount = 2;
   // min motor ramp time TODO: use time scale
-int motorRampMin = 700;
+float motorRampMin = 0.7;
   // max motor ramp time TODO: use time scale
-int motorRampMax = 1700;
+float motorRampMax = 1.7;
 
 /* UTIL FUNCTIONS ------------------------------------------- */
 
@@ -53,11 +53,14 @@ int motorSpeed() {
 
 // alter ramp time
 void randomizeRampTime(int i) {
-  int factor = random(76);
+  int factor = random(int(0.076 * float(timeScale)));
   if (random(2) == 0) {
     factor = factor * (-1);
   }
-  rampTime[i] = constrain(rampTime[i] + factor * timeScale, motorRampMin * timeScale, motorRampMax * timeScale);
+  Serial.print(i);
+  Serial.print(": ");
+  Serial.println(factor);
+  rampTime[i] = constrain(rampTime[i] + factor, int(motorRampMin * float(timeScale)), int(motorRampMax * float(timeScale)));
 }
 
 void rampUp(int i) {
@@ -92,9 +95,9 @@ void setup() {
 
   // start asleep
   // TODO: can a knob change this though?
-  timeScale = map(analogRead(A0), 0, 670, 1, 100);
-  Serial.print("TIMESCALE: ");
-  Serial.println(map(analogRead(A0), 0, 670, 1, 100));
+  timeScale = map(analogRead(A0), 0, 670, 500, 2000);
+  Serial.print("TIMESCALE SETUP: ");
+  Serial.println(timeScale);
   // try isExpired instead of onExpired at beginning?
   sleepTimer.setTimeout(sleepTime * timeScale);
   sleepTimer.restart();
@@ -104,18 +107,11 @@ void setup() {
 /* LOOP ----------------------------------------------------- */
 
 void loop() {  
-  // Serial.print("Speed: ");
-  // Serial.println(motor[0].getSpeed());
 
-  // TODO: scale times
-  // awakeTimer = awakeTimer * scale;
-  // sleepTimer = sleepTimer * scale;
-  // rampTimer[] = rampTime * scale;
-  // Serial.println(analogRead(A0));
-  timeScale = map(analogRead(A0), 0, 670, 1, 100);
+  timeScale = map(analogRead(A0), 0, 670, 500, 2000);
   if(sleepTimer.onExpired()) {
     Serial.print("TIMESCALE: ");
-    Serial.println(map(analogRead(A0), 0, 670, 1, 100));
+    Serial.println(map(analogRead(A0), 0, 670, 500, 2000));
     Serial.print("Waking for ");
     Serial.println(awakeTime * timeScale);
 
@@ -128,19 +124,18 @@ void loop() {
   for (int i = 0; i < motorCount; i++) {
     if(rampTimer[i].onExpired()){
       if (rampingUp[i]) {
-        Serial.print(i);
-        Serial.println(": ramp down");
+        // Serial.print(i);
+        // Serial.println(": ramp down");
         rampDown(i);
       } else {
-        Serial.print(i);
-        Serial.println(": ramp up");
+        // Serial.print(i);
+        // Serial.println(": ramp up");
         rampUp(i);
       }
     }
   }
 
   if (awakeTimer.onExpired()) {
-    Serial.println("awake time expired");
     for (int i = 0; i < motorCount; i++) {
       if (rampingUp[i]) {
         rampDown(i);
