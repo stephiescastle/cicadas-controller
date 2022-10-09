@@ -33,16 +33,17 @@ unsigned long rampTime[] = {1200, 1200};
 RBD::Timer rampTimer[] = {(rampTime[0]), rampTime[1]};
   // use in for loops
 static const uint8_t motorCount = 2;
-  // min motor ramp time
-int motorRampMin = 1000;
-  // max motor ramp time
-int motorRampMax = 2000;
+  // min motor ramp time TODO: use time scale
+int motorRampMin = 700;
+  // max motor ramp time TODO: use time scale
+int motorRampMax = 1700;
+
 /* UTIL FUNCTIONS ------------------------------------------- */
 
 int motorSpeed() {
   // TODO: use knob to set the value here
   if(awake) {
-    return 170;
+    return 150;
   } else {
     return 0;
   }
@@ -55,9 +56,32 @@ void randomizeRampTime(int i) {
     factor = factor *(-1);
   }
   rampTime[i] = constrain(rampTime[i] + factor, motorRampMin, motorRampMax);
-  Serial.print(i);
-  Serial.print(": ");
-  Serial.println(rampTime[i]);
+  // Serial.print(i);
+  // Serial.print(": ");
+  // Serial.println(rampTime[i]);
+}
+
+void rampUp(int i) {
+  rampingUp[i] = true;
+  randomizeRampTime(i);
+  rampTimer[i].setTimeout(rampTime[i]);
+  rampTimer[i].restart();
+  // ramp up the motor
+  if (awake) {
+    motor[i].ramp(motorSpeed(), rampTime[i]);
+  }
+}
+
+void rampDown(int i) {
+  rampingUp[i] = false;
+  randomizeRampTime(i);
+  rampTimer[i].setTimeout(rampTime[i]);
+  rampTimer[i].restart();
+  // ramp down the motor
+  if (awake) {
+    // TODO: instead of off, maybe make this a randomized pwm value
+    motor[i].ramp(0, rampTime[i]);
+  }
 }
 
 /* SETUP ---------------------------------------------------- */
@@ -68,6 +92,7 @@ void setup() {
 
   // start asleep
   // TODO: can a knob change this though?
+  // try isExpired instead of onExpired at beginning?
   sleepTimer.setTimeout(sleepTime);
   sleepTimer.restart();
 
@@ -89,48 +114,21 @@ void loop() {
     Serial.println("SLEEP time expired");
 
     awake = true;
-    
-    // update the awakeTime timer
     awakeTimer.setTimeout(awakeTime);
-    
-    // start the awakeTime timer
     awakeTimer.restart();
 
-    // randomizeRampTime()
-
-    // start the rampUp timer for each motor
-    // TODO: this is too uniform. Need some kind of delay per motor?
-    for (int i = 0; i < motorCount; i++) {
-      randomizeRampTime(i);
-
-      rampingUp[i] = true;
-      rampTimer[i].setTimeout(rampTime[i]);
-      rampTimer[i].restart();
-
-      // ramp up the motor
-      motor[i].ramp(motorSpeed(), rampTime[i]);
-    }    
   }
-  // randomizeRampTime()
+
   for (int i = 0; i < motorCount; i++) {
     if(rampTimer[i].onExpired()){
-      randomizeRampTime(i);
-      // start the rampdown timer
       if (rampingUp[i]) {
-        rampingUp[i] = false;
-        rampTimer[i].restart();
-        // ramp down the motor
-        if (awake) {
-          motor[i].ramp(0, rampTime[i]);
-        }
+        Serial.print(i);
+        Serial.println(": ramp down");
+        rampDown(i);
       } else {
-        randomizeRampTime(i);
-        rampingUp[i] = true;
-        rampTimer[i].restart();
-        // ramp up the motor
-        if (awake) {
-          motor[i].ramp(motorSpeed(), rampTime[i]);
-        }
+        Serial.print(i);
+        Serial.println(": ramp up");
+        rampUp(i);
       }
     }
   }
@@ -138,13 +136,9 @@ void loop() {
   if (awakeTimer.onExpired()) {
     Serial.println("awake time expired");
     for (int i = 0; i < motorCount; i++) {
-      // make sure it turns off
-      rampingUp[i] = false;
-      // TODO: not working quite right. Let it finish a ramp up/down cycle, don't interrupt it
-      if (rampTimer[i].isExpired()) {
-        rampTimer[i].restart();
+      if (rampingUp[i]) {
+        rampDown(i);
       }
-      motor[i].ramp(0, rampTime[i]);
     }
     // go to sleep
     awake = false;
