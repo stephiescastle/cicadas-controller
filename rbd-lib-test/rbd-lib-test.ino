@@ -94,27 +94,6 @@ void ramp(int i, bool up) {
   }
 }
 
-// void rampUp(int i) {
-//   rampingUp[i] = true;
-//   randomizeRampTime(i);
-//   rampTimer[i].setTimeout(rampTime[i]);
-//   rampTimer[i].restart();
-//   if (awake) {
-//     motor[i].ramp(motorSpeed(), rampTime[i]);
-//   }
-// }
-
-// void rampDown(int i) {
-//   rampingUp[i] = false;
-//   randomizeRampTime(i);
-//   rampTimer[i].setTimeout(rampTime[i]);
-//   rampTimer[i].restart();
-//   if (awake) {
-//     // TODO: instead of 0 or off, maybe make this a randomized pwm value
-//     motor[i].ramp(0, rampTime[i]);
-//   }
-// }
-
 /* SETUP ---------------------------------------------------- */
 
 void setup() {

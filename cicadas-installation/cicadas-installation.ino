@@ -29,7 +29,7 @@ bool awake = false;
 // sleep duration (s)
 unsigned long sleepTime = 6;
 // awake duration  (s)
-unsigned long awakeTime = 20;
+unsigned long awakeTime = 24;
 // time scale (ms)
 long timeScale = 1000;
 // min timeScale (ms);
@@ -37,7 +37,7 @@ int timeScaleMin = 500;
 // max timeScale (ms);
 int timeScaleMax = 2000;
 // base ramp time for motors (ms) TODO: change to (s)?
-long motorRampBasis = 3000;
+unsigned long rampBasis = 6000;
 // min motor ramp time (s)
 float motorRampMin = 0.7;
 // max motor ramp time (s)
@@ -57,7 +57,7 @@ RBD::Motor motor[] = {(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13)};
 // ramp direction for each per motor
 bool rampingUp[] = {true, true, true, true, true, true, true, true, true, true, true, true}; 
 // ramp durations for each motor (ms)
-unsigned long rampTime[] = {motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis};
+unsigned long rampTime[] = {rampBasis, rampBasis, rampBasis, rampBasis, rampBasis, rampBasis, rampBasis, rampBasis, rampBasis, rampBasis, rampBasis, rampBasis};
 // create and set timer for each motor
 RBD::Timer rampTimer[] = {rampTime[0], rampTime[1], rampTime[2], rampTime[3], rampTime[4], rampTime[5], rampTime[6], rampTime[7], rampTime[8], rampTime[9], rampTime[10], rampTime[11]};
 
@@ -81,7 +81,7 @@ static const uint8_t knobPin[] = {A12,A13,A14};
 // ---- Reading / Storing Values ---- //
 int motorKnobValue[] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
 int motorToggleValue[] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
-int knobValue[] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+int knobValue[] = {-1,-1,-1};
 int switchValue[] = {-1,-1,-1,-1};
 
 // ---- Global Timers ---- //
@@ -94,7 +94,8 @@ RBD::Timer awakeTimer(awakeTime*timeScale);
 
 int motorSpeed() {
   if(awake) {
-    intensity = map(knobPin[0], 0, 1023, 0, intensityMax);
+    intensity = map(knobValue[0], 0, 1023, 0, intensityMax);
+    // Serial.println(knobValue[0]);
     return intensity;
   } else {
     return 0;
@@ -143,7 +144,7 @@ void setup() {
   }
 
   // set timeScale
-  timeScale = map(knobPin[1], 0, 1023, timeScaleMin, timeScaleMax);
+  timeScale = map(knobValue[1], 0, 1023, timeScaleMin, timeScaleMax);
   Serial.print("TIMESCALE SETUP: ");
   Serial.println(timeScale);
 
@@ -173,7 +174,7 @@ void loop() {
     // Serial.println(switchValue[i]);
   }
   // read motorKnobPin 
-  for (int i = 0; i < 12; i++) {
+  for (int i = 0; i < motorCount; i++) {
     motorKnobValue[i] =  map(analogRead(motorKnobPin[i]), 0, 1023, 0, 255);
     // Serial.print("motorKnobValue[");
     // Serial.print(i);
@@ -181,7 +182,7 @@ void loop() {
     // Serial.println(motorKnobValue[i]);
   }
   // read motorTogglePin 
-  for (int i = 0; i < 12; i++) {
+  for (int i = 0; i < motorCount; i++) {
     motorToggleValue[i] = digitalRead(motorTogglePin[i]);
     // Serial.print("motorToggleValue[");
     // Serial.print(i);
@@ -192,7 +193,7 @@ void loop() {
   // -- Evaluate & Do -- //
 
   // update timescale
-  timeScale = map(knobPin[1], 0, 1023, timeScaleMin, timeScaleMax);
+  timeScale = map(knobValue[1], 0, 1023, timeScaleMin, timeScaleMax);
 
   if(sleepTimer.onExpired()) {
     Serial.print("TIMESCALE: ");
@@ -236,23 +237,23 @@ void loop() {
   // -- Controller board -- //
   // TODO: Check if there's a controller board
   // TODO: This will override any of the timing stuff above, so I need to section it off
-  for (int i = 0; i < 12; i++) {
-    if (motorToggleValue[i] == 1) {
-      // check if motor is switched on first (off if no controller board)
-      if (switchValue[1] == 1) {
-        // if main board override, use main board knob for all
-        motor[i].setSpeed(map(knobValue[0], 0, 1023, 0, 255));
-        // analogWrite(motorDriverPin[i], knobValue[0]);
-      } else {
-        motor[i].setSpeed(motorKnobValue[i]);
-        // analogWrite(motorDriverPin[i], motorKnobValue[i]);
-      }
-    } else {
-      // off
-      motor[i].setSpeed(0);
-      // analogWrite(motorDriverPin[i], 0);
-    }
-  }
+  // for (int i = 0; i < 12; i++) {
+  //   if (motorToggleValue[i] == 1) {
+  //     // check if motor is switched on first (off if no controller board)
+  //     if (switchValue[1] == 1) {
+  //       // if main board override, use main board knob for all
+  //       motor[i].setSpeed(map(knobValue[0], 0, 1023, 0, 255));
+  //       // analogWrite(motorDriverPin[i], knobValue[0]);
+  //     } else {
+  //       motor[i].setSpeed(motorKnobValue[i]);
+  //       // analogWrite(motorDriverPin[i], motorKnobValue[i]);
+  //     }
+  //   } else {
+  //     // off
+  //     motor[i].setSpeed(0);
+  //     // analogWrite(motorDriverPin[i], 0);
+  //   }
+  // }
   // -- End controller board -- //
 
   // REQUIRED FOR ALL -- update motors
