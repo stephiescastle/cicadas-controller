@@ -1,4 +1,6 @@
 {
-    "configuration": "cpu=atmega2560",
-    "board": "arduino:avr:mega"
+    "board": "arduino:avr:mega",
+    "sketch": "cicadas-tester/cicadas-tester.ino",
+    "port": "/dev/tty.usbserial-01D961BC",
+    "configuration": "cpu=atmega2560"
 }
