@@ -1,4 +1,5 @@
 {
-    "configuration": "cpu=atmega2560",
-    "board": "arduino:avr:mega"
+    "board": "arduino:avr:uno",
+    "sketch": "rbd-motor-text/rbd-motor-text.ino",
+    "port": "/dev/tty.usbserial-01D961BC"
 }

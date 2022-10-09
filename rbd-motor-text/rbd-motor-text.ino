@@ -2,67 +2,81 @@
 // https://github.com/alextaujenis/RBD_Motor
 // Copyright (c) 2015 Alex Taujenis - MIT License
 
+// specific example https://github.com/alextaujenis/RBD_Motor/issues/5
+// basic example  https://github.com/alextaujenis/RBD_Motor/blob/master/examples/spin_up_and_down/spin_up_and_down.ino
+
 #include <RBD_Timer.h> // https://github.com/alextaujenis/RBD_Timer
 #include <RBD_Motor.h> // https://github.com/alextaujenis/RBD_Motor
 
 RBD::Motor motor(3); // pwm pin
-RBD::Timer runtime_timer; // track the runtime
-RBD::Timer ramp_timer; // track the ramp up and down time
-bool ramping_up = true;
-unsigned long runtime = 10000;
-bool is_running = false;
-unsigned long motor_ramp_time = 1000;
+RBD::Timer sleepTimer; // track the sleepTime
+RBD::Timer emergeTimer; // track the emergeTime
+RBD::Timer ramp_timer; // track the ramp up and down time // TODO: will need for each motor []
+
+unsigned long emergeTime = 10000; // ms
+unsigned long sleepTime = 13000; // ms
+bool is_emerged = false;
+unsigned long motor_ramp_time = 1000; // TODO: will need for each motor []
+bool ramping_up = true; // TODO: will need for each motor []
 
 void setup() {
-  // motor.rampDown(100);
   Serial.begin(9600);
-  runtime_timer.setTimeout(runtime);
-  ramp_timer.setTimeout(motor_ramp_time);
+   emergeTimer.setTimeout(emergeTime);
+   sleepTimer.setTimeout(sleepTime);
+   ramp_timer.setTimeout(motor_ramp_time);
 }
 
-void loop() {
-  // motor.update();
-  
+void loop() {  
   Serial.print("Speed: ");
   Serial.println(motor.getSpeed());
-//  
-//  if (motor.isOff()) {
-//    motor.setSpeed(100);
-//    Serial.println("off bitches");
-//    motor.rampUp(13000);
-//  } else if(motor.isOn()) {
-//    motor.rampDown(3000);
+  
+//  if (sleepTimer.onExpired()) {
+//    is_emerged = true;
+//    
 //  }
 
-  if(!is_running) {
-    // set a flag to disable the button during the runtime
-    is_running = true;
-    // update the runtime timer
-    runtime_timer.setTimeout(runtime);
-    // start the runtime timer
-    runtime_timer.restart();
+  if(sleepTimer.onExpired()) {
+    // set a flag to disable the button during the emergeTime
+    is_emerged = true;
+    Serial.println("SLEEP time expired");
+    
+    // update the emergeTime timer
+    emergeTimer.setTimeout(emergeTime);
+    
+    // start the emergeTime timer
+    emergeTimer.restart();
+    
     // start the rampup timer
     ramping_up = true;
     ramp_timer.restart();
+    
     // ramp up the motor
     motor.ramp(motorSpeed(), motor_ramp_time);
-    // start playing the MP3
-    // mp3.start();
+    
   }
-   if(ramp_timer.onExpired()){
+  if(ramp_timer.onExpired()){
     // start the rampdown timer
     if (ramping_up) {
        ramping_up = false;
        ramp_timer.restart();
        // ramp down the motor
-       motor.ramp(0, motor_ramp_time);
+       if (is_emerged) {
+         motor.ramp(0, motor_ramp_time);
+       }
     } else {
       ramping_up = true;
-    ramp_timer.restart();
-    // ramp up the motor
-    motor.ramp(motorSpeed(), motor_ramp_time);
+      ramp_timer.restart();
+      // ramp up the motor
+      if (is_emerged) {
+        motor.ramp(motorSpeed(), motor_ramp_time);
+      }
     }
+  }
 
+  if (emergeTimer.onExpired()) {
+    is_emerged = false;
+    Serial.println("emerge time expired");
+    sleepTimer.restart();
   }
 
 motor.update();
@@ -82,7 +96,7 @@ motor.update();
 }
 
 int motorSpeed() {
-  if(is_running) {
+  if(is_emerged) {
     return 150;
   }
   else {
