@@ -10,35 +10,41 @@
 
 /* VARS & CLASSES -------------------------------------------- */
 
-// Global Pod States
-  // time scale
-int timeScale = 1000;
-  // sleep duration TODO: use timescale
-unsigned long sleepTime = 4;
-  // sleep timer
-RBD::Timer sleepTimer(sleepTime*timeScale);
-  // awake duration TODO: use timescale
-unsigned long awakeTime = 12;
-  // awake timer
-RBD::Timer awakeTimer(awakeTime*timeScale);
-  // if pod is awake or sleeping
+// ---- Global Pod States ---- //
+// if group is awake or sleeping
 bool awake = false;
+// time scale
+long timeScale = 1000;
+// min timeScale (ms);
+int timeScaleMin = 500;
+// max timeScale (ms);
+int timeScaleMax = 2000;
+// sleep duration (s)
+unsigned long sleepTime = 4;
+// awake duration  (s)
+unsigned long awakeTime = 12;
+// sleep timer
+RBD::Timer sleepTimer(sleepTime*timeScale);
+// awake timer
+RBD::Timer awakeTimer(awakeTime*timeScale);
 
-// Individual Cicada States
-  // motor pins
-RBD::Motor motor[] = {(3), (5)};
-  // ramp direction for each per motor
-bool rampingUp[] = {true, true}; 
-  // ramp durations for each motor TODO: use timescale
-unsigned long rampTime[] = {1200, 1200};
-  // create and set timer for each motor
-RBD::Timer rampTimer[] = {(rampTime[0]), rampTime[1]};
-  // use in for loops
+// ---- Individual Cicada States ---- //
+// number of motors in arrays
 static const uint8_t motorCount = 2;
-  // min motor ramp time TODO: use time scale
+// motor pins
+RBD::Motor motor[] = {(3), (5)};
+// ramp direction for each per motor
+bool rampingUp[] = {true, true}; 
+// ramp durations for each motor (ms)
+unsigned long rampTime[] = {1000, 1000};
+// create and set timer for each motor
+RBD::Timer rampTimer[] = {(rampTime[0]), rampTime[1]};
+// min motor ramp time (s)
 float motorRampMin = 0.7;
-  // max motor ramp time TODO: use time scale
+// max motor ramp time (s)
 float motorRampMax = 1.7;
+// randomization range (s)
+float rampFactor = 0.076;
 
 /* UTIL FUNCTIONS ------------------------------------------- */
 
@@ -53,13 +59,10 @@ int motorSpeed() {
 
 // alter ramp time
 void randomizeRampTime(int i) {
-  int factor = random(int(0.076 * float(timeScale)));
+  int factor = random(int(rampFactor * float(timeScale)));
   if (random(2) == 0) {
     factor = factor * (-1);
   }
-  Serial.print(i);
-  Serial.print(": ");
-  Serial.println(factor);
   rampTime[i] = constrain(rampTime[i] + factor, int(motorRampMin * float(timeScale)), int(motorRampMax * float(timeScale)));
 }
 
@@ -68,7 +71,6 @@ void rampUp(int i) {
   randomizeRampTime(i);
   rampTimer[i].setTimeout(rampTime[i]);
   rampTimer[i].restart();
-  // ramp up the motor
   if (awake) {
     motor[i].ramp(motorSpeed(), rampTime[i]);
   }
@@ -79,9 +81,8 @@ void rampDown(int i) {
   randomizeRampTime(i);
   rampTimer[i].setTimeout(rampTime[i]);
   rampTimer[i].restart();
-  // ramp down the motor
   if (awake) {
-    // TODO: instead of off, maybe make this a randomized pwm value
+    // TODO: instead of 0 or off, maybe make this a randomized pwm value
     motor[i].ramp(0, rampTime[i]);
   }
 }
@@ -93,12 +94,12 @@ void setup() {
   // TODO: change this pin number to an unused pin
   randomSeed(analogRead(A5));
 
-  // start asleep
-  // TODO: can a knob change this though?
-  timeScale = map(analogRead(A0), 0, 670, 500, 2000);
+  // set timeScale
+  timeScale = map(analogRead(A0), 0, 670, timeScaleMin, timeScaleMax);
   Serial.print("TIMESCALE SETUP: ");
   Serial.println(timeScale);
-  // try isExpired instead of onExpired at beginning?
+
+  // start asleep
   sleepTimer.setTimeout(sleepTime * timeScale);
   sleepTimer.restart();
 
@@ -107,35 +108,34 @@ void setup() {
 /* LOOP ----------------------------------------------------- */
 
 void loop() {  
+  
+  // update timeScale
+  timeScale = map(analogRead(A0), 0, 670, timeScaleMin, timeScaleMax);
 
-  timeScale = map(analogRead(A0), 0, 670, 500, 2000);
   if(sleepTimer.onExpired()) {
     Serial.print("TIMESCALE: ");
-    Serial.println(map(analogRead(A0), 0, 670, 500, 2000));
+    Serial.println(timeScale);
+
     Serial.print("Waking for ");
     Serial.println(awakeTime * timeScale);
 
     awake = true;
     awakeTimer.setTimeout(awakeTime * timeScale);
     awakeTimer.restart();
-
   }
 
   for (int i = 0; i < motorCount; i++) {
     if(rampTimer[i].onExpired()){
       if (rampingUp[i]) {
-        // Serial.print(i);
-        // Serial.println(": ramp down");
         rampDown(i);
       } else {
-        // Serial.print(i);
-        // Serial.println(": ramp up");
         rampUp(i);
       }
     }
   }
 
   if (awakeTimer.onExpired()) {
+    // ramp down anything in progress
     for (int i = 0; i < motorCount; i++) {
       if (rampingUp[i]) {
         rampDown(i);
