@@ -14,28 +14,30 @@ RBD::Timer emergeTimer; // track the emergeTime
 RBD::Timer ramp_timer; // track the ramp up and down time // TODO: will need for each motor []
 
 unsigned long emergeTime = 10000; // ms
-unsigned long sleepTime = 13000; // ms
+unsigned long sleepTime = 3000; // ms
 bool is_emerged = false;
 unsigned long motor_ramp_time = 1000; // TODO: will need for each motor []
 bool ramping_up = true; // TODO: will need for each motor []
 
 void setup() {
   Serial.begin(9600);
-   emergeTimer.setTimeout(emergeTime);
-   sleepTimer.setTimeout(sleepTime);
-   ramp_timer.setTimeout(motor_ramp_time);
+  // emergeTimer.setTimeout(emergeTime);
+  sleepTimer.setTimeout(sleepTime);
+  sleepTimer.restart();
+  // ramp_timer.setTimeout(motor_ramp_time);
 }
 
 void loop() {  
   Serial.print("Speed: ");
   Serial.println(motor.getSpeed());
-  
-//  if (sleepTimer.onExpired()) {
-//    is_emerged = true;
-//    
-//  }
 
+  // sleepTimer.setTimeout(sleepTime);
+  // sleepTimer.restart();
+  // sleepTimer.onRestart({
+  //   Serial.println('interval thing');
+  // });
   if(sleepTimer.onExpired()) {
+    Serial.println("gonna wake up now");
     // set a flag to disable the button during the emergeTime
     is_emerged = true;
     Serial.println("SLEEP time expired");
@@ -48,6 +50,7 @@ void loop() {
     
     // start the rampup timer
     ramping_up = true;
+    ramp_timer.setTimeout(motor_ramp_time);
     ramp_timer.restart();
     
     // ramp up the motor
@@ -79,19 +82,7 @@ void loop() {
     sleepTimer.restart();
   }
 
-motor.update();
-//  // RAMP LIBRARY EXAMPLE
-//  myRamp.update());
-//  
-//  analogWrite(3, myRamp.getValue());
-//  if (myRamp.getValue() == 0) {
-//    target = 255;
-//    // myRamp.go(target, 10000);
-//  }
-//  if (myRamp.getValue() == 255) {
-//    target = 0;
-//    myRamp.go(target, 10000);
-//  }
+  motor.update();
 
 }
 
