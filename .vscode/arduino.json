@@ -1,5 +1,6 @@
 {
-    "board": "arduino:avr:uno",
-    "sketch": "rbd-motor-text/rbd-motor-text.ino",
-    "port": "/dev/tty.usbserial-01D961BC"
+    "board": "arduino:avr:mega",
+    "sketch": "cicadas-tester/cicadas-tester.ino",
+    "port": "/dev/tty.usbserial-01D961BC",
+    "configuration": "cpu=atmega2560"
 }

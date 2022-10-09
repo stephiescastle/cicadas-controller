@@ -10,7 +10,7 @@
 
 /* VARS & CLASSES -------------------------------------------- */
 
-// ---- Global Pod States ---- //
+// ---- Global Brood States ---- //
 // if group is awake or sleeping
 bool awake = false;
 // time scale
@@ -20,9 +20,9 @@ int timeScaleMin = 500;
 // max timeScale (ms);
 int timeScaleMax = 2000;
 // sleep duration (s)
-unsigned long sleepTime = 4;
+unsigned long sleepTime = 6;
 // awake duration  (s)
-unsigned long awakeTime = 12;
+unsigned long awakeTime = 20;
 // sleep timer
 RBD::Timer sleepTimer(sleepTime*timeScale);
 // awake timer
@@ -36,7 +36,7 @@ RBD::Motor motor[] = {(3), (5)};
 // ramp direction for each per motor
 bool rampingUp[] = {true, true}; 
 // ramp durations for each motor (ms)
-unsigned long rampTime[] = {1000, 1000};
+unsigned long rampTime[] = {3000, 3000};
 // create and set timer for each motor
 RBD::Timer rampTimer[] = {(rampTime[0]), rampTime[1]};
 // min motor ramp time (s)
@@ -46,12 +46,23 @@ float motorRampMax = 1.7;
 // randomization range (s)
 float rampFactor = 0.076;
 
+// ---- Knob assignments ---- //
+
+// TODO: alternate: use switch on main board to set mode for knobs
+// alt mode would be timing changes, like ramp time basis, and awake time or sleep time
+// wish i had three knobs!
+int timeScaleKnob = A0;
+int intensityKnob = A1;
+int intensity = 150;
+int intensityMax = 255;
+
 /* UTIL FUNCTIONS ------------------------------------------- */
 
 int motorSpeed() {
   // TODO: use knob to set the value here
   if(awake) {
-    return 150;
+    intensity = map(analogRead(intensityKnob), 0, 670, 0, intensityMax);
+    return intensity;
   } else {
     return 0;
   }
@@ -66,26 +77,43 @@ void randomizeRampTime(int i) {
   rampTime[i] = constrain(rampTime[i] + factor, int(motorRampMin * float(timeScale)), int(motorRampMax * float(timeScale)));
 }
 
-void rampUp(int i) {
-  rampingUp[i] = true;
+void ramp(int i, bool up) {
+  // up = true --> ramp up
+  // up = false --> ramp down
+  rampingUp[i] = up;
   randomizeRampTime(i);
   rampTimer[i].setTimeout(rampTime[i]);
   rampTimer[i].restart();
   if (awake) {
-    motor[i].ramp(motorSpeed(), rampTime[i]);
+    if (up) {
+      motor[i].ramp(motorSpeed(), rampTime[i]);
+    } else {
+      // TODO: instead of 0 or off, maybe make this a randomized pwm value
+      motor[i].ramp(0, rampTime[i]);
+    }
   }
 }
 
-void rampDown(int i) {
-  rampingUp[i] = false;
-  randomizeRampTime(i);
-  rampTimer[i].setTimeout(rampTime[i]);
-  rampTimer[i].restart();
-  if (awake) {
-    // TODO: instead of 0 or off, maybe make this a randomized pwm value
-    motor[i].ramp(0, rampTime[i]);
-  }
-}
+// void rampUp(int i) {
+//   rampingUp[i] = true;
+//   randomizeRampTime(i);
+//   rampTimer[i].setTimeout(rampTime[i]);
+//   rampTimer[i].restart();
+//   if (awake) {
+//     motor[i].ramp(motorSpeed(), rampTime[i]);
+//   }
+// }
+
+// void rampDown(int i) {
+//   rampingUp[i] = false;
+//   randomizeRampTime(i);
+//   rampTimer[i].setTimeout(rampTime[i]);
+//   rampTimer[i].restart();
+//   if (awake) {
+//     // TODO: instead of 0 or off, maybe make this a randomized pwm value
+//     motor[i].ramp(0, rampTime[i]);
+//   }
+// }
 
 /* SETUP ---------------------------------------------------- */
 
@@ -95,7 +123,7 @@ void setup() {
   randomSeed(analogRead(A5));
 
   // set timeScale
-  timeScale = map(analogRead(A0), 0, 670, timeScaleMin, timeScaleMax);
+  timeScale = map(analogRead(timeScaleKnob), 0, 670, timeScaleMin, timeScaleMax);
   Serial.print("TIMESCALE SETUP: ");
   Serial.println(timeScale);
 
@@ -110,7 +138,7 @@ void setup() {
 void loop() {  
   
   // update timeScale
-  timeScale = map(analogRead(A0), 0, 670, timeScaleMin, timeScaleMax);
+  timeScale = map(analogRead(timeScaleKnob), 0, 670, timeScaleMin, timeScaleMax);
 
   if(sleepTimer.onExpired()) {
     Serial.print("TIMESCALE: ");
@@ -127,9 +155,11 @@ void loop() {
   for (int i = 0; i < motorCount; i++) {
     if(rampTimer[i].onExpired()){
       if (rampingUp[i]) {
-        rampDown(i);
+        // ramp down
+        ramp(i, false);
       } else {
-        rampUp(i);
+        // ramp up
+        ramp(i, true);
       }
     }
   }
@@ -138,7 +168,7 @@ void loop() {
     // ramp down anything in progress
     for (int i = 0; i < motorCount; i++) {
       if (rampingUp[i]) {
-        rampDown(i);
+        ramp(i, false);
       }
     }
     // go to sleep

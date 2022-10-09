@@ -1,143 +1,263 @@
-// https://github.com/alextaujenis/RBD_Motor/blob/master/examples/forward_and_reverse/forward_and_reverse.ino
-#include <RBD_Timer.h>
-#include <RBD_Motor.h>
-
-
 /**************************************
 
   control dc motor with pwm
   pin mapping key: https://docs.google.com/spreadsheets/d/1_K7wllq-jH08pGu8_E4yZduzdHvDAcWqfF-e0n92yMI/edit#gid=0
 
   - realtime timer, with flexibility to change scale of time
-  - a lifecycle with variability within 
+  - a lifecycle with variability within
     - ramp all up and all down with a period of sustaining.
-    - in the sustaining period, there is slight movements up and down per motor (randomized)
+    - TODO: in the sustaining period, there is slight movements up and down per motor (randomized)
     - a lifecycle is all of the motors doing this for a period of time
     - one ball per that is extra noisy? (the last one?)
-  - main board button - trigger lifecycle button
-  - main board switch - toggle between using programmed cycle vs waiting for controller inputs
+  - TODO: main board button - trigger lifecycle button
+  - TODO: main board switch - toggle between using programmed cycle vs waiting for controller inputs, or toggle between knob modes
   - main board intensity limit knob
   - main board time scale knob
-  - peripheral switch for knobs - use knobs to set intensity limit per motor. (how to save state though?)
-  - peripheral switch for switches - override with motor switches (everything else is preprogrammed)
+  - TODO: peripheral switch for knobs - use knobs to set intensity limit per motor. (how to save state though?)
+  - TODO: peripheral switch for switches - override with motor switches (everything else is preprogrammed)
 
 **************************************/
 
-// Basic motor control (12)
-static const uint8_t motorDriverPins[] = {2,3,4,5,6,7,8,9,10,11,12,13};
-static const uint8_t motorTogglePins[] = {22,23,24,25,26,27,28,29,30,31,32,33};
-static const uint8_t motorKnobPins[] = {A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11};
+#include <RBD_Timer.h>
+#include <RBD_Motor.h>
 
-// Switches
-// switchPins[0] = main board button
-// switchPins[1] = main board switch
-// switchPins[2] = peripheral switch for switches (override motor on/off) 
-// switchPins[3] = peripheral swich for knobs (calibration)
-static const uint8_t switchPins[] = {34,35,36,37};
+/* VARS & CLASSES -------------------------------------------- */
 
-// Knobs
-// knobPins[0] = main board intensity knob
-// knobPins[1] = main board time scale knob
-// knobPins[2] = peripheral j-connector input
-static const uint8_t knobPins[] = {A12,A13,A14};
+// ---- Limits, Constants, States ---- //
+// if brood is awake or sleeping
+bool awake = false;
+// sleep duration (s)
+unsigned long sleepTime = 6;
+// awake duration  (s)
+unsigned long awakeTime = 20;
+// time scale (ms)
+long timeScale = 1000;
+// min timeScale (ms);
+int timeScaleMin = 500;
+// max timeScale (ms);
+int timeScaleMax = 2000;
+// base ramp time for motors (ms) TODO: change to (s)?
+long motorRampBasis = 3000;
+// min motor ramp time (s)
+float motorRampMin = 0.7;
+// max motor ramp time (s)
+float motorRampMax = 1.7;
+// randomization range (+/- s)
+float rampFactor = 0.076;
+// motor intensity
+int intensity = 150;
+int intensityMax = 255;
 
-// Reading and storing values
-int motorKnobValues[] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
-int motorToggleValues[] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
-int knobValues[] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
-int switchValues[] = {-1,-1,-1,-1};
+// ---- Individual Motor/Cicada States ---- //
+// number of motors in arrays
+static const uint8_t motorCount = 12;
+// motor pins
+// static const uint8_t motorDriverPin[] = {2,3,4,5,6,7,8,9,10,11,12,13};
+RBD::Motor motor[] = {(2),(3),(4),(5),(6),(7),(8),(9),(10),(11),(12),(13)};
+// ramp direction for each per motor
+bool rampingUp[] = {true, true, true, true, true, true, true, true, true, true, true, true}; 
+// ramp durations for each motor (ms)
+unsigned long rampTime[] = {motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis, motorRampBasis};
+// create and set timer for each motor
+RBD::Timer rampTimer[] = {rampTime[0], rampTime[1], rampTime[2], rampTime[3], rampTime[4], rampTime[5], rampTime[6], rampTime[7], rampTime[8], rampTime[9], rampTime[10], rampTime[11]};
 
-// Timing
-// some stuff here: https://forum.arduino.cc/t/ramp-to-speed-over-defined-duration/562652/6
-// ramp up time: https://forum.arduino.cc/t/trying-to-make-ramp-up-timer/576501/3
-// RAMP library https://github.com/siteswapjuggler/RAMP/issues/19 
-unsigned long previousMillis = 0;
-unsigned long currentMillis = 0;
-float timeScale = 1.0; // this should be knob-changeable // TODO: consider changing to int and changing ramp times to seconds (scale would be 1000)
-long rampUpTime = 5000; // TODO: this should eventually be based on the timescale
-long sustainTime = 10000; // TODO: this should eventually be based on the timescale
-long rampDownTime = 5000; // TODO: this should eventually be based on the timescale
-int restInterval = 10000; // TODO: use timescale
-int initialRate = 0;
-int finalRate = 150; // TODO: this should be knob-changeable
+// ---- Motor Control Inputs ---- //
+static const uint8_t motorTogglePin[] = {22,23,24,25,26,27,28,29,30,31,32,33};
+static const uint8_t motorKnobPin[] = {A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11};
 
-void setup() {
-  // setup digital pins
-  for (int i = 0; i < 12; i++) {
-    pinMode(motorDriverPins[i], OUTPUT);
+// ---- General Switches ---- //
+// switchPin[0] = main board button
+// switchPin[1] = main board switch
+// switchPin[2] = peripheral switch for switches (override motor on/off) 
+// switchPin[3] = peripheral swich for knobs (calibration)
+static const uint8_t switchPin[] = {34,35,36,37};
+
+// ---- General Knobs ---- //
+// knobPin[0] = main board intensity knob
+// knobPin[1] = main board time scale knob
+// knobPin[2] = peripheral j-connector input
+static const uint8_t knobPin[] = {A12,A13,A14};
+
+// ---- Reading / Storing Values ---- //
+int motorKnobValue[] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+int motorToggleValue[] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+int knobValue[] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+int switchValue[] = {-1,-1,-1,-1};
+
+// ---- Global Timers ---- //
+// sleep timer
+RBD::Timer sleepTimer(sleepTime*timeScale);
+// awake timer
+RBD::Timer awakeTimer(awakeTime*timeScale);
+
+/* UTIL FUNCTIONS ------------------------------------------- */
+
+int motorSpeed() {
+  if(awake) {
+    intensity = map(knobPin[0], 0, 1023, 0, intensityMax);
+    return intensity;
+  } else {
+    return 0;
   }
-  for (int i = 0; i < 12; i++) {
-    pinMode(motorTogglePins[i], INPUT);
-  }
-  for (int i = 0; i < 4; i++) {
-    pinMode(switchPins[i], INPUT);
-  }
-  // this particular one is buggy
-  pinMode(motorTogglePins[6], INPUT_PULLUP);
-
-  // start serial communications at 9600 baud
-  // Serial.begin(9600);
-
 }
 
-void loop() {
-  // set time
-  currentMillis = millis();
-  if (currentMillis - previousMillis >= restInterval) {
-    previousMillis = currentMillis;
-    do {
-      brightness1 = brightness1 + fadeAmount;
+// alter ramp time
+void randomizeRampTime(int i) {
+  int factor = random(int(rampFactor * float(timeScale)));
+  if (random(2) == 0) {
+    factor = factor * (-1);
+  }
+  rampTime[i] = constrain(rampTime[i] + factor, int(motorRampMin * float(timeScale)), int(motorRampMax * float(timeScale)));
+}
+
+void ramp(int i, bool up) {
+  // up = true --> ramp up
+  // up = false --> ramp down
+  rampingUp[i] = up;
+  randomizeRampTime(i);
+  rampTimer[i].setTimeout(rampTime[i]);
+  rampTimer[i].restart();
+  if (awake) {
+    if (up) {
+      motor[i].ramp(motorSpeed(), rampTime[i]);
+    } else {
+      // TODO: instead of 0 or off, maybe make this a randomized pwm value
+      motor[i].ramp(0, rampTime[i]);
     }
-    while (brightness1 > pwm1);
   }
+}
 
-  // read knobPins
-  for (int i = 0; i < 3; i++) {
-    knobValues[i] = map(analogRead(knobPins[i]), 0, 1023, 0, 255);
-    // Serial.print("knobValues[");
-    // Serial.print(i);
-    // Serial.print("] = ");
-    // Serial.println(knobValues[i]);
+/* SETUP ---------------------------------------------------- */
+
+void setup() {
+  Serial.begin(9600);
+  // reset randomizers w/ unused analog pin
+  randomSeed(analogRead(A15));
+
+  // setup digital pins
+  for (int i = 0; i < 12; i++) {
+    pinMode(motorTogglePin[i], INPUT);
   }
-  // read switchPins
   for (int i = 0; i < 4; i++) {
-    switchValues[i] = digitalRead(switchPins[i]);
-    // Serial.print("switchValues[");
-    // Serial.print(i);
-    // Serial.print("] = ");
-    // Serial.println(switchValues[i]);
-  }
-  // read motorKnobPins 
-  for (int i = 0; i < 12; i++) {
-    motorKnobValues[i] =  map(analogRead(motorKnobPins[i]), 0, 1023, 0, 255);
-    // Serial.print("motorKnobValues[");
-    // Serial.print(i);
-    // Serial.print("] = ");
-    // Serial.println(motorKnobValues[i]);
-  }
-  // read motorTogglePins 
-  for (int i = 0; i < 12; i++) {
-    motorToggleValues[i] = digitalRead(motorTogglePins[i]);
-    // Serial.print("motorToggleValues[");
-    // Serial.print(i);
-    // Serial.print("] = ");
-    // Serial.println(motorToggleValues[i]);
+    pinMode(switchPin[i], INPUT);
   }
 
-  // evaluate and do
+  // set timeScale
+  timeScale = map(knobPin[1], 0, 1023, timeScaleMin, timeScaleMax);
+  Serial.print("TIMESCALE SETUP: ");
+  Serial.println(timeScale);
+
+  // start asleep
+  sleepTimer.setTimeout(sleepTime * timeScale);
+  sleepTimer.restart();
+}
+
+/* LOOP ----------------------------------------------------- */
+
+void loop() {
+
+  // read knobPin
+  for (int i = 0; i < 3; i++) {
+    knobValue[i] = analogRead(knobPin[i]);
+    // Serial.print("knobValue[");
+    // Serial.print(i);
+    // Serial.print("] = ");
+    // Serial.println(knobValue[i]);
+  }
+  // read switchPin
+  for (int i = 0; i < 4; i++) {
+    switchValue[i] = digitalRead(switchPin[i]);
+    // Serial.print("switchValue[");
+    // Serial.print(i);
+    // Serial.print("] = ");
+    // Serial.println(switchValue[i]);
+  }
+  // read motorKnobPin 
   for (int i = 0; i < 12; i++) {
-    if (motorToggleValues[i] == 1) {
-      // drive motor if switched on
-      if (switchValues[1] == 1) {
-        // if main board override, use main board knob for all
-        analogWrite(motorDriverPins[i], knobValues[0]);
+    motorKnobValue[i] =  map(analogRead(motorKnobPin[i]), 0, 1023, 0, 255);
+    // Serial.print("motorKnobValue[");
+    // Serial.print(i);
+    // Serial.print("] = ");
+    // Serial.println(motorKnobValue[i]);
+  }
+  // read motorTogglePin 
+  for (int i = 0; i < 12; i++) {
+    motorToggleValue[i] = digitalRead(motorTogglePin[i]);
+    // Serial.print("motorToggleValue[");
+    // Serial.print(i);
+    // Serial.print("] = ");
+    // Serial.println(motorToggleValue[i]);
+  }
+  
+  // -- Evaluate & Do -- //
+
+  // update timescale
+  timeScale = map(knobPin[1], 0, 1023, timeScaleMin, timeScaleMax);
+
+  if(sleepTimer.onExpired()) {
+    Serial.print("TIMESCALE: ");
+    Serial.println(timeScale);
+
+    Serial.print("Waking for ");
+    Serial.println(awakeTime * timeScale);
+
+    awake = true;
+    awakeTimer.setTimeout(awakeTime * timeScale);
+    awakeTimer.restart();
+  }
+
+  for (int i = 0; i < motorCount; i++) {
+    if(rampTimer[i].onExpired()){
+      if (rampingUp[i]) {
+        // ramp down
+        ramp(i, false);
       } else {
-        analogWrite(motorDriverPins[i], motorKnobValues[i]);
+        // ramp up
+        ramp(i, true);
+      }
+    }
+  }
+
+  if (awakeTimer.onExpired()) {
+    // ramp down anything in progress
+    for (int i = 0; i < motorCount; i++) {
+      if (rampingUp[i]) {
+        ramp(i, false);
+      }
+    }
+    // go to sleep
+    awake = false;
+    sleepTimer.setTimeout(sleepTime * timeScale);
+    sleepTimer.restart();
+    Serial.print("Sleeping for ");
+    Serial.println(sleepTime * timeScale);
+  }
+
+  // -- Controller board -- //
+  // TODO: Check if there's a controller board
+  // TODO: This will override any of the timing stuff above, so I need to section it off
+  for (int i = 0; i < 12; i++) {
+    if (motorToggleValue[i] == 1) {
+      // check if motor is switched on first (off if no controller board)
+      if (switchValue[1] == 1) {
+        // if main board override, use main board knob for all
+        motor[i].setSpeed(map(knobValue[0], 0, 1023, 0, 255));
+        // analogWrite(motorDriverPin[i], knobValue[0]);
+      } else {
+        motor[i].setSpeed(motorKnobValue[i]);
+        // analogWrite(motorDriverPin[i], motorKnobValue[i]);
       }
     } else {
       // off
-      analogWrite(motorDriverPins[i], 0);
+      motor[i].setSpeed(0);
+      // analogWrite(motorDriverPin[i], 0);
     }
+  }
+  // -- End controller board -- //
+
+  // REQUIRED FOR ALL -- update motors
+  for (int i = 0; i < motorCount; i++) {
+    motor[i].update();
   }
 
 }
