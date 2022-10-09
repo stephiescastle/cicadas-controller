@@ -8,89 +8,122 @@
 #include <RBD_Timer.h> // https://github.com/alextaujenis/RBD_Timer
 #include <RBD_Motor.h> // https://github.com/alextaujenis/RBD_Motor
 
-RBD::Motor motor(3); // pwm pin
-RBD::Timer sleepTimer; // track the sleepTime
-RBD::Timer emergeTimer; // track the emergeTime
-RBD::Timer ramp_timer; // track the ramp up and down time // TODO: will need for each motor []
+/* VARS & CLASSES -------------------------------------------- */
 
-unsigned long emergeTime = 10000; // ms
-unsigned long sleepTime = 3000; // ms
-bool is_emerged = false;
-unsigned long motor_ramp_time = 1000; // TODO: will need for each motor []
-bool ramping_up = true; // TODO: will need for each motor []
+// Global Pod States
+  // sleep duration
+unsigned long sleepTime = 3000;
+  // sleep timer
+RBD::Timer sleepTimer(sleepTime);
+  // awake duration
+unsigned long awakeTime = 10000;
+  // awake timer
+RBD::Timer awakeTimer(awakeTime);
+  // if pod is awake or sleeping
+bool awake = false;
+
+// Individual Cicada States
+  // motor pins
+RBD::Motor motor[] = {(3), (5)};
+  // ramp direction for each per motor
+bool rampingUp[] = {true, true}; 
+  // ramp durations for each motor
+unsigned long rampTime[] = {1000, 1000};
+  // create and set timer for each motor
+RBD::Timer rampTimer[] = {(rampTime[0]), rampTime[1]};
+  // easy var for array lengths
+int motorCount = 2;
+
+/* UTIL FUNCTIONS ------------------------------------------- */
+
+int motorSpeed() {
+  // TODO: use knob to set the value here
+  if(awake) {
+    return 170;
+  } else {
+    return 0;
+  }
+}
+
+/* SETUP ---------------------------------------------------- */
 
 void setup() {
   Serial.begin(9600);
-  // emergeTimer.setTimeout(emergeTime);
+  // start asleep
+  // TODO: can a knob change this though?
   sleepTimer.setTimeout(sleepTime);
   sleepTimer.restart();
-  // ramp_timer.setTimeout(motor_ramp_time);
 }
 
-void loop() {  
-  Serial.print("Speed: ");
-  Serial.println(motor.getSpeed());
+/* LOOP ----------------------------------------------------- */
 
-  // sleepTimer.setTimeout(sleepTime);
-  // sleepTimer.restart();
-  // sleepTimer.onRestart({
-  //   Serial.println('interval thing');
-  // });
+void loop() {  
+  // Serial.print("Speed: ");
+  // Serial.println(motor[0].getSpeed());
+
+  // scale times
+  // awakeTimer = awakeTimer * scale;
+  // sleepTimer = sleepTimer * scale;
+  // rampTimer[] = rampTime * scale;
+
   if(sleepTimer.onExpired()) {
-    Serial.println("gonna wake up now");
-    // set a flag to disable the button during the emergeTime
-    is_emerged = true;
     Serial.println("SLEEP time expired");
+
+    awake = true;
     
-    // update the emergeTime timer
-    emergeTimer.setTimeout(emergeTime);
+    // update the awakeTime timer
+    awakeTimer.setTimeout(awakeTime);
     
-    // start the emergeTime timer
-    emergeTimer.restart();
+    // start the awakeTime timer
+    awakeTimer.restart();
     
-    // start the rampup timer
-    ramping_up = true;
-    ramp_timer.setTimeout(motor_ramp_time);
-    ramp_timer.restart();
-    
-    // ramp up the motor
-    motor.ramp(motorSpeed(), motor_ramp_time);
-    
-  }
-  if(ramp_timer.onExpired()){
-    // start the rampdown timer
-    if (ramping_up) {
-       ramping_up = false;
-       ramp_timer.restart();
-       // ramp down the motor
-       if (is_emerged) {
-         motor.ramp(0, motor_ramp_time);
-       }
-    } else {
-      ramping_up = true;
-      ramp_timer.restart();
+    // start the rampUp timer for each motor
+    for (int i = 0; i < motorCount; i++) {
+      rampingUp[i] = true;
+      rampTimer[i].setTimeout(rampTime[i]);
+      rampTimer[i].restart();
+
       // ramp up the motor
-      if (is_emerged) {
-        motor.ramp(motorSpeed(), motor_ramp_time);
+      motor[i].ramp(motorSpeed(), rampTime[i]);
+    }    
+  }
+  for (int i = 0; i < motorCount; i++) {
+    if(rampTimer[i].onExpired()){
+      // start the rampdown timer
+      if (rampingUp[i]) {
+        rampingUp[i] = false;
+        rampTimer[i].restart();
+        // ramp down the motor
+        if (awake) {
+          motor[i].ramp(0, rampTime[i]);
+        }
+      } else {
+        rampingUp[i] = true;
+        rampTimer[i].restart();
+        // ramp up the motor
+        if (awake) {
+          motor[i].ramp(motorSpeed(), rampTime[i]);
+        }
       }
     }
   }
 
-  if (emergeTimer.onExpired()) {
-    is_emerged = false;
-    Serial.println("emerge time expired");
+  if (awakeTimer.onExpired()) {
+    Serial.println("awake time expired");
+    for (int i = 0; i < motorCount; i++) {
+      // make sure it turns off
+      rampingUp[i] = false;
+      rampTimer[i].restart();
+      motor[i].ramp(0, rampTime[i]);
+    }
+    // go to sleep
+    awake = false;
+    sleepTimer.setTimeout(sleepTime);
     sleepTimer.restart();
   }
 
-  motor.update();
-
-}
-
-int motorSpeed() {
-  if(is_emerged) {
-    return 150;
+  for (int i = 0; i < motorCount; i++) {
+    motor[i].update();
   }
-  else {
-    return 0;
-  }
+
 }
