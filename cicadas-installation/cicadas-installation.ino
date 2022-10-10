@@ -92,14 +92,23 @@ RBD::Timer awakeTimer(awakeTime*timeScale);
 
 /* UTIL FUNCTIONS ------------------------------------------- */
 
-int motorSpeed() {
+// return the desired pwm depending on other factors
+int motorSpeed(bool varied = false) {
   if(awake) {
     intensity = map(knobValue[0], 0, 1023, 0, intensityMax);
-    // Serial.println(knobValue[0]);
-    return intensity;
+    if (varied) {
+      return variedIntensity();
+    } else {
+      return intensity;
+    }
   } else {
     return 0;
   }
+}
+
+// vary the target intensity (pwm) by reducing with a varying percentage of itself (between 25-75%)
+long variedIntensity() {
+  return intensity - int(float(intensity) * (float(random(25,76))*.01));
 }
 
 // alter ramp time
@@ -111,7 +120,7 @@ void randomizeRampTime(int i) {
   rampTime[i] = constrain(rampTime[i] + factor, int(motorRampMin * float(timeScale)), int(motorRampMax * float(timeScale)));
 }
 
-void ramp(int i, bool up) {
+void ramp(int i, bool up = false) {
   // up = true --> ramp up
   // up = false --> ramp down
   rampingUp[i] = up;
@@ -122,9 +131,17 @@ void ramp(int i, bool up) {
     if (up) {
       motor[i].ramp(motorSpeed(), rampTime[i]);
     } else {
-      // TODO: instead of 0 or off, maybe make this a randomized pwm value
-      motor[i].ramp(0, rampTime[i]);
+      // explore making the ramp timer shorter for the sustain period
+      // use varied motorSpeed
+      motor[i].ramp(motorSpeed(true), rampTime[i]);
+      Serial.print("Sustain PWM for [");
+      Serial.print(i);
+      Serial.print("]: ");
+      Serial.println(variedIntensity());
     }
+  } else {
+    // off
+    motor[i].ramp(0, rampTime[i]);
   }
 }
 
@@ -176,18 +193,10 @@ void loop() {
   // read motorKnobPin 
   for (int i = 0; i < motorCount; i++) {
     motorKnobValue[i] =  map(analogRead(motorKnobPin[i]), 0, 1023, 0, 255);
-    // Serial.print("motorKnobValue[");
-    // Serial.print(i);
-    // Serial.print("] = ");
-    // Serial.println(motorKnobValue[i]);
   }
   // read motorTogglePin 
   for (int i = 0; i < motorCount; i++) {
     motorToggleValue[i] = digitalRead(motorTogglePin[i]);
-    // Serial.print("motorToggleValue[");
-    // Serial.print(i);
-    // Serial.print("] = ");
-    // Serial.println(motorToggleValue[i]);
   }
   
   // -- Evaluate & Do -- //
@@ -211,7 +220,7 @@ void loop() {
     if(rampTimer[i].onExpired()){
       if (rampingUp[i]) {
         // ramp down
-        ramp(i, false);
+        ramp(i);
       } else {
         // ramp up
         ramp(i, true);
@@ -222,9 +231,7 @@ void loop() {
   if (awakeTimer.onExpired()) {
     // ramp down anything in progress
     for (int i = 0; i < motorCount; i++) {
-      if (rampingUp[i]) {
-        ramp(i, false);
-      }
+      ramp(i);
     }
     // go to sleep
     awake = false;
