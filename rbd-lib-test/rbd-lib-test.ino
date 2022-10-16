@@ -35,8 +35,10 @@ static const uint8_t motorCount = 2;
 RBD::Motor motor[] = {(3), (5)};
 // ramp direction for each per motor
 bool rampingUp[] = {true, true}; 
+// base ramp time for motors (ms) TODO: change to (s)?
+unsigned long rampBasis = 3000;
 // ramp durations for each motor (ms)
-unsigned long rampTime[] = {3000, 3000};
+unsigned long rampTime[] = {rampBasis, rampBasis};
 // create and set timer for each motor
 RBD::Timer rampTimer[] = {(rampTime[0]), rampTime[1]};
 // min motor ramp time (s)
@@ -45,6 +47,7 @@ float motorRampMin = 0.7;
 float motorRampMax = 1.7;
 // randomization range (s)
 float rampFactor = 0.076;
+
 
 // ---- Knob assignments ---- //
 
@@ -58,14 +61,25 @@ int intensityMax = 255;
 
 /* UTIL FUNCTIONS ------------------------------------------- */
 
-int motorSpeed() {
+// return the desired pwm depending on other factors
+int motorSpeed(bool varied = false) {
   // TODO: use knob to set the value here
   if(awake) {
     intensity = map(analogRead(intensityKnob), 0, 670, 0, intensityMax);
-    return intensity;
+    if (varied) {
+      return variedIntensity();
+    } else {
+        return intensity;
+    }
   } else {
     return 0;
   }
+}
+
+// vary the target intensity (pwm)
+long variedIntensity() {
+  // reduce by a varying percentage of itself (between 25-75%)
+  return intensity - int(float(intensity) * (float(random(25,76))*.01));
 }
 
 // alter ramp time
@@ -77,7 +91,7 @@ void randomizeRampTime(int i) {
   rampTime[i] = constrain(rampTime[i] + factor, int(motorRampMin * float(timeScale)), int(motorRampMax * float(timeScale)));
 }
 
-void ramp(int i, bool up) {
+void ramp(int i, bool up = false) {
   // up = true --> ramp up
   // up = false --> ramp down
   rampingUp[i] = up;
@@ -86,34 +100,21 @@ void ramp(int i, bool up) {
   rampTimer[i].restart();
   if (awake) {
     if (up) {
+      // always start at full pwm range
       motor[i].ramp(motorSpeed(), rampTime[i]);
     } else {
-      // TODO: instead of 0 or off, maybe make this a randomized pwm value
-      motor[i].ramp(0, rampTime[i]);
+      // explore making the timer shorter
+      motor[i].ramp(motorSpeed(true), rampTime[i]);
+      Serial.print("Sustain PWM for [");
+      Serial.print(i);
+      Serial.print("]: ");
+      Serial.println(variedIntensity());
     }
+  } else {
+    // off
+    motor[i].ramp(0, rampTime[i]);
   }
 }
-
-// void rampUp(int i) {
-//   rampingUp[i] = true;
-//   randomizeRampTime(i);
-//   rampTimer[i].setTimeout(rampTime[i]);
-//   rampTimer[i].restart();
-//   if (awake) {
-//     motor[i].ramp(motorSpeed(), rampTime[i]);
-//   }
-// }
-
-// void rampDown(int i) {
-//   rampingUp[i] = false;
-//   randomizeRampTime(i);
-//   rampTimer[i].setTimeout(rampTime[i]);
-//   rampTimer[i].restart();
-//   if (awake) {
-//     // TODO: instead of 0 or off, maybe make this a randomized pwm value
-//     motor[i].ramp(0, rampTime[i]);
-//   }
-// }
 
 /* SETUP ---------------------------------------------------- */
 
@@ -156,7 +157,7 @@ void loop() {
     if(rampTimer[i].onExpired()){
       if (rampingUp[i]) {
         // ramp down
-        ramp(i, false);
+        ramp(i);
       } else {
         // ramp up
         ramp(i, true);
@@ -167,9 +168,9 @@ void loop() {
   if (awakeTimer.onExpired()) {
     // ramp down anything in progress
     for (int i = 0; i < motorCount; i++) {
-      if (rampingUp[i]) {
-        ramp(i, false);
-      }
+      // if (rampingUp[i]) {
+        ramp(i);
+      // }
     }
     // go to sleep
     awake = false;

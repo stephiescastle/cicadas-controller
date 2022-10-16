@@ -55,18 +55,18 @@ void loop() {
   // read motorKnobPin 
   for (int i = 0; i < 12; i++) {
     motorKnobValue[i] =  map(analogRead(motorKnobPin[i]), 0, 1023, 0, 255);
-    Serial.print("motorKnobValue[");
-    Serial.print(i);
-    Serial.print("] = ");
-    Serial.println(motorKnobValue[i]);
+//    Serial.print("motorKnobValue[");
+//    Serial.print(i);
+//    Serial.print("] = ");
+//    Serial.println(motorKnobValue[i]);
   }
   // read motorTogglePin 
   for (int i = 0; i < 12; i++) {
     motorToggleValue[i] = digitalRead(motorTogglePin[i]);
-    Serial.print("motorToggleValue[");
-    Serial.print(i);
-    Serial.print("] = ");
-    Serial.println(motorToggleValue[i]);
+//    Serial.print("motorToggleValue[");
+//    Serial.print(i);
+//    Serial.print("] = ");
+//    Serial.println(motorToggleValue[i]);
   }
   
   // do something

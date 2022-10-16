@@ -1,6 +1,6 @@
 {
     "board": "arduino:avr:mega",
-    "sketch": "cicadas-tester/cicadas-tester.ino",
-    "port": "/dev/tty.usbserial-01D961BC",
+    "sketch": "cicadas-installation/cicadas-installation.ino",
+    "port": "/dev/tty.usbmodem101",
     "configuration": "cpu=atmega2560"
 }
