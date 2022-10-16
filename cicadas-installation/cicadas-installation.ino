@@ -5,8 +5,8 @@
 
   - realtime timer, with flexibility to change scale of time
   - a lifecycle with variability within
-    - ramp all up and all down with a period of sustaining.
-    - in the sustaining period, there is slight movements up and down per motor (randomized)
+    - ramp all up and all down with a period of sustained cycling.
+    - in the sustain period, there is slight movement up and down per motor (randomized)
     - TODO: randomize base PWM drastically (each cycle, not each ramp) - strong brood vs weaker brood
     - a lifecycle is all of the motors doing this for a period of time
     - one ball per that is extra noisy? (the last one?)
@@ -24,6 +24,11 @@
     - TODO: do we need intensity min? two knobs to control threshold?
   - TODOs immediate prep
     - random event, modulo 6 or 7 (rand) that puts them all in unison ramp up and down
+    - serial print scale variables to easily set these during the install
+    - need ability to toggle knob inputs for changing timing settings (use hard-coded values vs use knobs)
+    - need ability to easily change if brood starts asleep or awake (in the code)
+    - randomized moment (mb every 16-22 cycles?) where motors will ramp up and down in unison to full pwm
+
 **************************************/
 
 #include <RBD_Timer.h>
@@ -55,7 +60,7 @@ float motorRampMax = 20;
 float rampFactor = 1.0;
 // motor intensity
 int intensity = 150;
-int intensityMax = 256;
+int intensityMax = 255;
 
 // ---- Individual Motor/Cicada States ---- //
 // number of motors in arrays
@@ -101,7 +106,7 @@ RBD::Timer awakeTimer(awakeTime*timeScale);
 
 /* UTIL FUNCTIONS ------------------------------------------- */
 
-// return the desired pwm depending on other factors
+// return the desired pwm derived from other factors
 int motorSpeed(bool varied = false) {
   if(awake) {
     intensity = map(knobValue[0], 0, 1023, 0, intensityMax);
@@ -111,50 +116,44 @@ int motorSpeed(bool varied = false) {
   }
 }
 
-// vary the target intensity (pwm) by reducing with a varying percentage of itself (between 25-75%)
+// vary the target intensity (pwm)
 long variedIntensity() {
-  // return intensity - int(float(intensity) * (float(random(25,76))*.01));
-  int variated = random(50, intensity);
-  // 70 is cut off. anything below that will be "off"
-//  if (variated < 75) {
-//    return 0;
-//  }
   // lighten it up
   if (random(3) < 1) {
     return 0;
   }
-  return variated;
+  return random(50, intensity+1); // add '1' since upper boundary is exclusive
 }
 
 // alter ramp time
 void randomizeRampTime(int i) {
   int factor = random(int(rampFactor * float(timeScale)));
+  // sometimes + sometimes -
   if (random(2) == 0) {
     factor = factor * (-1);
   }
   rampTime[i] = constrain(rampBasis + factor, int(motorRampMin * float(timeScale)), int(motorRampMax * float(timeScale)));
 }
 
-void ramp(int i, bool up = false) {
-  // up = true --> ramp up
-  // up = false --> ramp down
-  rampingUp[i] = up;
+void ramp(int i, bool rampUp = false) {
+  // rampUp = true --> ramp up
+  // rampUp = false --> ramp down
+  rampingUp[i] = rampUp;
   randomizeRampTime(i);
   rampTimer[i].setTimeout(rampTime[i]);
   rampTimer[i].restart();
   if (awake) {
-    if (up) {
+    if (rampUp) {
       motor[i].ramp(motorSpeed(), rampTime[i]);
     } else {
-      // explore making the ramp timer shorter for the sustain period
-      // use varied motorSpeed
+      // TODO: explore making the ramp timer shorter for the sustain period
       motor[i].ramp(motorSpeed(), rampTime[i]);
-      Serial.print("Sustain PWM for [");
-      Serial.print(i);
-      Serial.print("]: ");
-      Serial.print(variedIntensity());
-      Serial.print(" for ");
-      Serial.println(rampTime[i]);
+      // Serial.print("Sustain PWM for [");
+      // Serial.print(i);
+      // Serial.print("]: ");
+      // Serial.print(variedIntensity());
+      // Serial.print(" for ");
+      // Serial.println(rampTime[i]);
     }
   } else {
     // off
