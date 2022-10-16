@@ -311,8 +311,8 @@ void loop() {
   } else {
     timeScale = defaultTimeScale;
     sleepTime = defaultSleepTime;
-    awakeTime = defaultAwakeTime; // 3 minutes;
-    rampBasis = defaultRampBasis; // half second to 20 seconds;
+    awakeTime = defaultAwakeTime;
+    rampBasis = defaultRampBasis;
   }
 
   // cycle button forces brood to wake
@@ -321,6 +321,7 @@ void loop() {
     awakeTimer.stop();
     wakeUp();
   }
+  // for debouncing
   prevButtonValue = switchValue[0];
 
   // wake up if done sleeping
