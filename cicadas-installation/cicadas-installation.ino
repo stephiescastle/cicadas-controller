@@ -32,7 +32,7 @@
 // if brood is awake or sleeping - also sets starting state
 bool awake = false;
 // sleep duration (s)
-unsigned long defaultSleepTime = 10; // 6
+unsigned long defaultSleepTime = 10; // 10
 unsigned long sleepTime = defaultSleepTime;
 // awake duration  (s) 
 unsigned long defaultAwakeTime = 24; // 24
