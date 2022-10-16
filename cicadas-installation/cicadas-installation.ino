@@ -105,7 +105,7 @@ unsigned long cycleCounter = 0;
 
 /* UTIL FUNCTIONS ------------------------------------------- */
 
-// if the brood is especially active!
+// determines when a brood is especially active!
 boolean strongBrood() {
   int iterations = random(7,9);
   if (cycleCounter % iterations == 0) {
