@@ -4,21 +4,19 @@
   pin mapping key: https://docs.google.com/spreadsheets/d/1_K7wllq-jH08pGu8_E4yZduzdHvDAcWqfF-e0n92yMI/edit#gid=0
 
   - realtime timer, with flexibility to change scale of time
+  - main board intensity limit knob
+  - main board time scale knob
   - a lifecycle with variability within
     - ramp all up and all down with a period of sustained cycling.
     - in the sustain period, there is slight movement up and down per motor (randomized)
     - TODO: randomize base PWM drastically (each cycle, not each ramp) - strong brood vs weaker brood
     - a lifecycle is all of the motors doing this for a period of time
     - one ball per that is extra noisy? (the last one?)
-
-  - TODO: main board switch - toggle between using programmed cycle vs waiting for controller inputs, or toggle between knob modes
-  - main board intensity limit knob
-  - main board time scale knob
   - TODO: peripheral switch for knobs - use knobs to set intensity limit per motor. (how to save state though?)
   - TODO: peripheral switch for switches - override with motor switches (everything else is preprogrammed)
   - TODOs for installation prep
     - DONE - need ability to easily change if brood starts asleep or awake (in the code)
-    - random event, modulo 6 or 7 (rand) that ramps motors up and down in unison to full pwm
+    - TEST - random event, modulo 6 or 7 (rand) that ramps motors up and down in unison to full pwm
     - DONE - serial print scale variables to easily set these during the install
     - DONE - need ability to toggle knob inputs for changing timing settings (use hard-coded values vs use knobs) - use onboard switch (on = use knob vals)
     - main board button - trigger lifecycle button -- button sets awake to true?
@@ -58,6 +56,7 @@ float motorRampMax = 20;
 float rampFactor = 1.0;
 // motor intensity
 int intensity = 150;
+int intensityMin = 50;
 int intensityMax = 255;
 
 // ---- Individual Motor/Cicada States ---- //
@@ -95,13 +94,25 @@ int ctrlSwitchValue[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
 int switchValue[4] = {-1,-1,-1,-1};
 int knobValue[3] = {-1,-1,-1};
 
-// ---- Global Timers ---- //
+// ---- Global Timers and Counters ---- //
 // sleep timer
 RBD::Timer sleepTimer(sleepTime*timeScale);
 // awake timer
 RBD::Timer awakeTimer(awakeTime*timeScale);
+// counter for how many life cycles have passed
+unsigned long cycleCounter = 0;
 
 /* UTIL FUNCTIONS ------------------------------------------- */
+
+// if the brood is especially active!
+boolean strongBrood() {
+  if (cycleCounter % 2 == 0) {
+    // every other time
+    return true;
+  } else {
+    return false;
+  }
+}
 
 // return the desired pwm derived from other factors
 int motorSpeed(bool varied = false) {
@@ -115,11 +126,16 @@ int motorSpeed(bool varied = false) {
 
 // vary the target intensity (pwm)
 long variedIntensity() {
-  // lighten it up
-  if (random(3) < 1) {
-    return 0;
+  if (!strongBrood()) {
+    // lighten it up
+    if (random(3) < 1) {
+      return 0;
+    }
+    return random(intensityMin, intensity+1); // add '1' since upper boundary is exclusive
+  } else {
+    // everything goes to nearly highest intensity for strong brood
+    return random(constrain(intensityMax-20, intensityMin, intensityMax), intensityMax+1);
   }
-  return random(50, intensity+1); // add '1' since upper boundary is exclusive
 }
 
 // alter ramp time
@@ -253,7 +269,10 @@ void loop() {
     awake = true;
     awakeTimer.setTimeout(awakeTime * timeScale);
     awakeTimer.restart();
+    cycleCounter++;
 
+    Serial.print(cycleCounter);
+    Serial.print(". ");
     Serial.print("WAKING for ");
     Serial.print(float(awakeTime) * float(timeScale) * .000016);
     Serial.println(" (min) ----------------- // ");
@@ -289,7 +308,9 @@ void loop() {
     awake = false;
     sleepTimer.setTimeout(sleepTime * timeScale);
     sleepTimer.restart();
-
+    
+    Serial.print(cycleCounter);
+    Serial.print(". ");
     Serial.print("SLEEPING for ");
     Serial.print(float(sleepTime) * float(timeScale) * .000016);
     Serial.println(" (min) --------------- // ");
