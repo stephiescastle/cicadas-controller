@@ -16,10 +16,10 @@
   - TODO: peripheral switch for switches - override with motor switches (everything else is preprogrammed)
   - TODOs for installation prep
     - DONE - need ability to easily change if brood starts asleep or awake (in the code)
-    - TEST - random event, modulo 6 or 7 (rand) that ramps motors up and down in unison to full pwm
+    - DONE - random event, modulo 6 or 7 (rand) that ramps motors up and down in unison to full pwm
     - DONE - serial print scale variables to easily set these during the install
     - DONE - need ability to toggle knob inputs for changing timing settings (use hard-coded values vs use knobs) - use onboard switch (on = use knob vals)
-    - main board button - trigger lifecycle button -- button sets awake to true?
+    - DONE - main board button - trigger lifecycle button -- button sets awake to true?
 
 **************************************/
 
@@ -93,6 +93,7 @@ int ctrlKnobValue[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
 int ctrlSwitchValue[12] = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
 int switchValue[4] = {-1,-1,-1,-1};
 int knobValue[3] = {-1,-1,-1};
+int prevButtonValue = 0;
 
 // ---- Global Timers and Counters ---- //
 // sleep timer
@@ -106,8 +107,12 @@ unsigned long cycleCounter = 0;
 
 // if the brood is especially active!
 boolean strongBrood() {
-  if (cycleCounter % 2 == 0) {
-    // every other time
+  int iterations = random(7,9);
+  if (cycleCounter % iterations == 0) {
+    // every 7-9 times variable to each motor
+    return true;
+  } else if (cycleCounter % 28 == 0) {
+    // every 28 times though for sure
     return true;
   } else {
     return false;
@@ -178,7 +183,7 @@ void ramp(int i, bool rampUp = false) {
 
 void setup() {
   Serial.begin(9600);
-  // reseed randomizers w/ unused analog pin
+  // re-seed randomizers w/ unused analog pin
   randomSeed(analogRead(A15));
 
   // setup digital pins
@@ -218,8 +223,7 @@ void setup() {
   Serial.println(awakeTime);
   Serial.print("SETUP rampBasis: ");
   Serial.println(rampBasis);
-
-  // start asleep
+  
   if (!awake) {
     sleepTimer.setTimeout(sleepTime * timeScale);
     sleepTimer.restart();
@@ -229,27 +233,73 @@ void setup() {
   }
 }
 
+void wakeUp() {
+  awake = true;
+  awakeTimer.setTimeout(awakeTime * timeScale);
+  awakeTimer.restart();
+  cycleCounter++;
+
+  Serial.print(cycleCounter);
+  Serial.print(". ");
+  Serial.print("WAKING for ");
+  Serial.print(float(awakeTime) * float(timeScale) * .000016);
+  Serial.println(" (min) ----------------- // ");
+  // output scale for installation reference
+  Serial.print("- timeScale: ");
+  Serial.println(timeScale);
+  Serial.print("- sleepTime: ");
+  Serial.println(sleepTime);
+  Serial.print("- awakeTime: ");
+  Serial.println(awakeTime);
+  Serial.print("- rampBasis: ");
+  Serial.println(rampBasis);
+}
+
+void goToSleep() {
+  // ramp down anything in progress
+  for (int i = 0; i < motorCount; i++) {
+    ramp(i);
+  }
+  // go to sleep
+  awake = false;
+  sleepTimer.setTimeout(sleepTime * timeScale);
+  sleepTimer.restart();
+  
+  Serial.print(cycleCounter);
+  Serial.print(". ");
+  Serial.print("SLEEPING for ");
+  Serial.print(float(sleepTime) * float(timeScale) * .000016);
+  Serial.println(" (min) --------------- // ");
+  // output scale for installation reference
+  Serial.print("- timeScale: ");
+  Serial.println(timeScale);
+  Serial.print("- sleepTime: ");
+  Serial.println(sleepTime);
+  Serial.print("- awakeTime: ");
+  Serial.println(awakeTime);
+  Serial.print("- rampBasis: ");
+  Serial.println(rampBasis);
+}
+
 /* LOOP ----------------------------------------------------- */
 
 void loop() {
 
-  // read knobPin
+  // -- Read Pin Values -- //
+  
   for (int i = 0; i < 3; i++) {
     knobValue[i] = analogRead(knobPin[i]);
   }
-  // read switchPin
   for (int i = 0; i < 4; i++) {
     switchValue[i] = digitalRead(switchPin[i]);
   }
-  // read ctrlKnobPin 
   for (int i = 0; i < motorCount; i++) {
     ctrlKnobValue[i] =  analogRead(ctrlKnobPin[i]);
   }
-  // read ctrlSwitchPin 
   for (int i = 0; i < motorCount; i++) {
     ctrlSwitchValue[i] = digitalRead(ctrlSwitchPin[i]);
   }
-  
+
   // -- Evaluate & Do -- //
 
   // update time scales if in manual control mode
@@ -265,28 +315,20 @@ void loop() {
     rampBasis = defaultRampBasis; // half second to 20 seconds;
   }
 
-  if(sleepTimer.onExpired()) {
-    awake = true;
-    awakeTimer.setTimeout(awakeTime * timeScale);
-    awakeTimer.restart();
-    cycleCounter++;
+  // cycle button forces brood to wake
+  if (switchValue[0] == 1 && switchValue[0] != prevButtonValue) {
+    sleepTimer.stop();
+    awakeTimer.stop();
+    wakeUp();
+  }
+  prevButtonValue = switchValue[0];
 
-    Serial.print(cycleCounter);
-    Serial.print(". ");
-    Serial.print("WAKING for ");
-    Serial.print(float(awakeTime) * float(timeScale) * .000016);
-    Serial.println(" (min) ----------------- // ");
-    // output scale for installation reference
-    Serial.print("- timeScale: ");
-    Serial.println(timeScale);
-    Serial.print("- sleepTime: ");
-    Serial.println(sleepTime);
-    Serial.print("- awakeTime: ");
-    Serial.println(awakeTime);
-    Serial.print("- rampBasis: ");
-    Serial.println(rampBasis);
+  // wake up if done sleeping
+  if(sleepTimer.onExpired()) {
+    wakeUp();
   }
 
+  // ramp up/down motors as needed
   for (int i = 0; i < motorCount; i++) {
     if(rampTimer[i].onExpired()){
       if (rampingUp[i]) {
@@ -299,30 +341,9 @@ void loop() {
     }
   }
 
+  // go to sleep if done with cycle
   if (awakeTimer.onExpired()) {
-    // ramp down anything in progress
-    for (int i = 0; i < motorCount; i++) {
-      ramp(i);
-    }
-    // go to sleep
-    awake = false;
-    sleepTimer.setTimeout(sleepTime * timeScale);
-    sleepTimer.restart();
-    
-    Serial.print(cycleCounter);
-    Serial.print(". ");
-    Serial.print("SLEEPING for ");
-    Serial.print(float(sleepTime) * float(timeScale) * .000016);
-    Serial.println(" (min) --------------- // ");
-    // output scale for installation reference
-    Serial.print("- timeScale: ");
-    Serial.println(timeScale);
-    Serial.print("- sleepTime: ");
-    Serial.println(sleepTime);
-    Serial.print("- awakeTime: ");
-    Serial.println(awakeTime);
-    Serial.print("- rampBasis: ");
-    Serial.println(rampBasis);
+    goToSleep();
   }
 
   // update motors
