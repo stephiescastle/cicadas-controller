@@ -179,13 +179,18 @@ void setup() {
 
   // set timeScale
   timeScale = map(knobValue[1], 0, 1023, timeScaleMin, timeScaleMax);
-  Serial.print("TIMESCALE SETUP: ");
+  Serial.print("SETUP timeScale: ");
   Serial.println(timeScale);
 
   sleepTime = map(ctrlKnobValue[0], 0, 1023, 6, 180); // 3 minutes;
   awakeTime = map(ctrlKnobValue[1], 0, 1023, 24, 180); // 3 minutes;
   rampBasis = map(ctrlKnobValue[2], 0, 1023, 500, 20000); // half second to 20 seconds;
-
+  Serial.print("SETUP sleepTime: ");
+  Serial.println(sleepTime);
+  Serial.print("SETUP awakeTime: ");
+  Serial.println(awakeTime);
+  Serial.print("SETUP rampBasis: ");
+  Serial.println(rampBasis);
 
   // start asleep
   sleepTimer.setTimeout(sleepTime * timeScale);
@@ -230,14 +235,17 @@ void loop() {
   rampBasis = map(ctrlKnobValue[2], 0, 1023, 500, 20000); // half second to 20 seconds;
 
   if(sleepTimer.onExpired()) {
-    Serial.print("TIMESCALE: ");
+    Serial.print("timeScale: ");
     Serial.println(timeScale);
+    Serial.print("sleepTime: ");
+    Serial.println(sleepTime);
+    Serial.print("awakeTime: ");
+    Serial.println(awakeTime);
+    Serial.print("rampBasis: ");
+    Serial.println(rampBasis);
 
     Serial.print("Waking for ");
     Serial.println(awakeTime * timeScale);
-
-    Serial.print("Ramp basis: ");
-    Serial.println(rampBasis);
 
     awake = true;
     awakeTimer.setTimeout(awakeTime * timeScale);
@@ -265,31 +273,17 @@ void loop() {
     awake = false;
     sleepTimer.setTimeout(sleepTime * timeScale);
     sleepTimer.restart();
+    Serial.print("timeScale: ");
+    Serial.println(timeScale);
+    Serial.print("sleepTime: ");
+    Serial.println(sleepTime);
+    Serial.print("awakeTime: ");
+    Serial.println(awakeTime);
+    Serial.print("rampBasis: ");
+    Serial.println(rampBasis);
     Serial.print("Sleeping for ");
     Serial.println(sleepTime * timeScale);
   }
-
-  // -- Controller board -- //
-  // TODO: Check if there's a controller board
-  // TODO: This will override any of the timing stuff above, so I need to section it off
-  // for (int i = 0; i < 12; i++) {
-  //   if (ctrlSwitchValue[i] == 1) {
-  //     // check if motor is switched on first (off if no controller board)
-  //     if (switchValue[1] == 1) {
-  //       // if main board override, use main board knob for all
-  //       motor[i].setSpeed(map(knobValue[0], 0, 1023, 0, 255));
-  //       // analogWrite(motorDriverPin[i], knobValue[0]);
-  //     } else {
-  //       motor[i].setSpeed(ctrlKnobValue[i]);
-  //       // analogWrite(motorDriverPin[i], ctrlKnobValue[i]);
-  //     }
-  //   } else {
-  //     // off
-  //     motor[i].setSpeed(0);
-  //     // analogWrite(motorDriverPin[i], 0);
-  //   }
-  // }
-  // -- End controller board -- //
 
   // REQUIRED FOR ALL -- update motors
   for (int i = 0; i < motorCount; i++) {
