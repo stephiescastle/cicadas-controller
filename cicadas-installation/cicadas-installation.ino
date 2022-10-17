@@ -179,6 +179,54 @@ void ramp(int i, bool rampUp = false) {
   }
 }
 
+void wakeUp() {
+  awake = true;
+  awakeTimer.setTimeout(awakeTime * timeScale);
+  awakeTimer.restart();
+  cycleCounter++;
+
+  Serial.print(cycleCounter);
+  Serial.print(". ");
+  Serial.print("WAKING for ");
+  Serial.print(float(awakeTime) * float(timeScale) * .000016);
+  Serial.println(" (min) ----------------- // ");
+  // output scale for installation reference
+  Serial.print("- timeScale: ");
+  Serial.println(timeScale);
+  Serial.print("- sleepTime: ");
+  Serial.println(sleepTime);
+  Serial.print("- awakeTime: ");
+  Serial.println(awakeTime);
+  Serial.print("- rampBasis: ");
+  Serial.println(rampBasis);
+}
+
+void goToSleep() {
+  // ramp down anything in progress
+  for (int i = 0; i < motorCount; i++) {
+    ramp(i);
+  }
+  // go to sleep
+  awake = false;
+  sleepTimer.setTimeout(sleepTime * timeScale);
+  sleepTimer.restart();
+  
+  Serial.print(cycleCounter);
+  Serial.print(". ");
+  Serial.print("SLEEPING for ");
+  Serial.print(float(sleepTime) * float(timeScale) * .000016);
+  Serial.println(" (min) --------------- // ");
+  // output scale for installation reference
+  Serial.print("- timeScale: ");
+  Serial.println(timeScale);
+  Serial.print("- sleepTime: ");
+  Serial.println(sleepTime);
+  Serial.print("- awakeTime: ");
+  Serial.println(awakeTime);
+  Serial.print("- rampBasis: ");
+  Serial.println(rampBasis);
+}
+
 /* SETUP ---------------------------------------------------- */
 
 void setup() {
@@ -231,54 +279,6 @@ void setup() {
     awakeTimer.setTimeout(awakeTime * timeScale);
     awakeTimer.restart();
   }
-}
-
-void wakeUp() {
-  awake = true;
-  awakeTimer.setTimeout(awakeTime * timeScale);
-  awakeTimer.restart();
-  cycleCounter++;
-
-  Serial.print(cycleCounter);
-  Serial.print(". ");
-  Serial.print("WAKING for ");
-  Serial.print(float(awakeTime) * float(timeScale) * .000016);
-  Serial.println(" (min) ----------------- // ");
-  // output scale for installation reference
-  Serial.print("- timeScale: ");
-  Serial.println(timeScale);
-  Serial.print("- sleepTime: ");
-  Serial.println(sleepTime);
-  Serial.print("- awakeTime: ");
-  Serial.println(awakeTime);
-  Serial.print("- rampBasis: ");
-  Serial.println(rampBasis);
-}
-
-void goToSleep() {
-  // ramp down anything in progress
-  for (int i = 0; i < motorCount; i++) {
-    ramp(i);
-  }
-  // go to sleep
-  awake = false;
-  sleepTimer.setTimeout(sleepTime * timeScale);
-  sleepTimer.restart();
-  
-  Serial.print(cycleCounter);
-  Serial.print(". ");
-  Serial.print("SLEEPING for ");
-  Serial.print(float(sleepTime) * float(timeScale) * .000016);
-  Serial.println(" (min) --------------- // ");
-  // output scale for installation reference
-  Serial.print("- timeScale: ");
-  Serial.println(timeScale);
-  Serial.print("- sleepTime: ");
-  Serial.println(sleepTime);
-  Serial.print("- awakeTime: ");
-  Serial.println(awakeTime);
-  Serial.print("- rampBasis: ");
-  Serial.println(rampBasis);
 }
 
 /* LOOP ----------------------------------------------------- */
