@@ -160,18 +160,21 @@ void ramp(int i, bool rampUp = false) {
   randomizeRampTime(i);
   rampTimer[i].setTimeout(rampTime[i]);
   rampTimer[i].restart();
+  // TODO: this logic is redundant, as motorSpeed() checks for awake and rampUp
   if (awake) {
     if (rampUp) {
+      // ramp down
       motor[i].ramp(motorSpeed(), rampTime[i]);
     } else {
+      // ramp up to variable intensity
       // TODO: explore making the ramp timer shorter for the sustain period
       motor[i].ramp(motorSpeed(), rampTime[i]);
-       Serial.print("-- sustain for [");
-       Serial.print(i);
-       Serial.print("]: ");
-       Serial.print(variedIntensity());
-       Serial.print(" for ");
-       Serial.println(rampTime[i]);
+      Serial.print("-- sustain for [");
+      Serial.print(i);
+      Serial.print("]: ");
+      Serial.print(variedIntensity());
+      Serial.print(" for ");
+      Serial.println(rampTime[i]);
     }
   } else {
     // off
