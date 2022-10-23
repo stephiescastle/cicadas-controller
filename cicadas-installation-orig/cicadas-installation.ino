@@ -28,9 +28,6 @@
 
 /* VARS & CLASSES -------------------------------------------- */
 
-// brood-specific values
-
-
 // ---- Limits, Constants, States ---- //
 // if brood is awake or sleeping - also sets starting state
 bool awake = false;
@@ -262,6 +259,13 @@ void setup() {
     ctrlSwitchValue[i] = digitalRead(ctrlSwitchPin[i]);
   }
 
+  // set time scales if in manual control mode
+  if (switchValue[1] == 1) {
+    timeScale = map(knobValue[1], 0, 1023, timeScaleMin, timeScaleMax);
+    sleepTime = map(ctrlKnobValue[0], 0, 1023, 6, 180); // 3 minutes;
+    awakeTime = map(ctrlKnobValue[1], 0, 1023, 24, 180); // 3 minutes;
+    rampBasis = map(ctrlKnobValue[2], 0, 1023, 500, 20000); // half second to 20 seconds;
+  }
   Serial.print("SETUP timeScale: ");
   Serial.println(timeScale);
   Serial.print("SETUP sleepTime: ");
@@ -303,44 +307,47 @@ void loop() {
 
   // update time scales if in manual control mode
   if (switchValue[1] == 1) {
-    // TEST MODE
-    for (int i = 0; i < motorCount; i++) {
-      motor[i].ramp(map(knobValue[0], 0, 1023, 0, intensityMax), 10);
-    }
+    timeScale = map(knobValue[1], 0, 1023, timeScaleMin, timeScaleMax);
+    sleepTime = map(ctrlKnobValue[0], 0, 1023, 6, 180); // 3 minutes;
+    awakeTime = map(ctrlKnobValue[1], 0, 1023, 24, 180); // 3 minutes;
+    rampBasis = map(ctrlKnobValue[2], 0, 1023, 500, 20000); // half second to 20 seconds;
   } else {
-    // LIFE CYCLES MODE
+    timeScale = defaultTimeScale;
+    sleepTime = defaultSleepTime;
+    awakeTime = defaultAwakeTime;
+    rampBasis = defaultRampBasis;
+  }
 
-    // cycle button forces brood to wake
-    if (switchValue[0] == 1 && switchValue[0] != prevButtonValue) {
-      sleepTimer.stop();
-      awakeTimer.stop();
-      wakeUp();
-    }
-    // for debouncing
-    prevButtonValue = switchValue[0];
-  
-    // wake up if done sleeping
-    if(sleepTimer.onExpired()) {
-      wakeUp();
-    }
-  
-    // ramp up/down motors as needed
-    for (int i = 0; i < motorCount; i++) {
-      if(rampTimer[i].onExpired()){
-        if (rampingUp[i]) {
-          // ramp down if previously ramping up
-          ramp(i);
-        } else {
-          // ramp up
-          ramp(i, true);
-        }
+  // cycle button forces brood to wake
+  if (switchValue[0] == 1 && switchValue[0] != prevButtonValue) {
+    sleepTimer.stop();
+    awakeTimer.stop();
+    wakeUp();
+  }
+  // for debouncing
+  prevButtonValue = switchValue[0];
+
+  // wake up if done sleeping
+  if(sleepTimer.onExpired()) {
+    wakeUp();
+  }
+
+  // ramp up/down motors as needed
+  for (int i = 0; i < motorCount; i++) {
+    if(rampTimer[i].onExpired()){
+      if (rampingUp[i]) {
+        // ramp down if previously ramping up
+        ramp(i);
+      } else {
+        // ramp up
+        ramp(i, true);
       }
     }
-  
-    // go to sleep if done with cycle
-    if (awakeTimer.onExpired()) {
-      goToSleep();
-    }
+  }
+
+  // go to sleep if done with cycle
+  if (awakeTimer.onExpired()) {
+    goToSleep();
   }
 
   // update motors
