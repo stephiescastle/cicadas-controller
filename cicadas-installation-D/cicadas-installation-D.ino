@@ -28,13 +28,14 @@
 
 /* VARS & CLASSES -------------------------------------------- */
 
-// BROOD  values
-long defaultTimeScale = 1000; // 1000
-unsigned long defaultSleepTime = 10; // 10
-unsigned long defaultAwakeTime = 24; // 24
-unsigned long defaultRampBasis = 6000; // 6000
+// BROOD C values
+// 1270	40	64	3200	FALSE	10
+long defaultTimeScale = 1270; // 1000
+unsigned long defaultSleepTime = 40; // 10
+unsigned long defaultAwakeTime = 64; // 24
+unsigned long defaultRampBasis = 3200; // 6000
 bool awake = false;
-int strongBroodRate = 7;
+int strongBroodRate = 10;
 
 // ---- Limits, Constants, States ---- //
 // if brood is awake or sleeping - also sets starting state
