@@ -110,9 +110,9 @@ unsigned long cycleCounter = 0;
 
 // determines when a brood is especially active!
 boolean strongBrood() {
-  int iterations = random(strongBroodRate,strongBroodRate+1);
+  int iterations = random(strongBroodRate,strongBroodRate+2);
   if (cycleCounter % iterations == 0) {
-    // every 7-9 times variable to each motor
+    // every (x) to (x+2) times for to each motor
     return true;
   } else if (cycleCounter % (strongBroodRate*4) == 0) {
     // every 28 times though for sure
@@ -167,7 +167,7 @@ void ramp(int i, bool rampUp = false) {
   if (awake) {
     if (rampUp) {
       // ramp down
-      motor[i].ramp(motorSpeed(), rampTime[i]);
+      motor[i].ramp(intensityMin, rampTime[i]);
     } else {
       // ramp up to variable intensity
       // TODO: explore making the ramp timer shorter for the sustain period
@@ -307,9 +307,21 @@ void loop() {
   
   // update time scales if in manual control mode
   if (switchValue[1] == 1) {
-    // TEST MODE
+    // CONTROLLER mode
     for (int i = 0; i < motorCount; i++) {
-      motor[i].ramp(map(knobValue[0], 0, 1023, 0, intensityMax), 10);
+      // if in manual override mode
+      if (ctrlSwitchValue[i] == 1) {
+        // if motor is switched on
+        if (switchValue[2] == 1) {
+          // if ctrl board override, use main board intensity knob for all
+          motor[i].ramp(map(knobValue[0], 0, 1023, 0, intensityMax), 0);
+        } else {
+          motor[i].ramp(map(ctrlKnobValue[i], 0, 1023, 0, intensityMax), 0);
+        }
+      } else {
+        // off
+        motor[i].ramp(0, 0);
+      }
     }
   } else {
     // LIFE CYCLES MODE
