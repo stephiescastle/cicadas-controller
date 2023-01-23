@@ -320,7 +320,7 @@ void loop() {
         }
       } else {
         // off
-        motor[i].ramp(0, intensityMax), 0);
+        motor[i].ramp(0, 0);
       }
     }
   } else {
