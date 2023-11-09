@@ -38,34 +38,34 @@ void loop() {
   // read parameterKnobPins
   for (int i = 0; i < 3; i++) {
     parameterKnobValues[i] = map(analogRead(parameterKnobPins[i]), 0, 1023, 0, 255);
-    // Serial.print("parameterKnobValues[");
-    // Serial.print(i);
-    // Serial.print("] = ");
-    // Serial.println(parameterKnobValues[i]);
+     Serial.print("parameterKnobValues[");
+     Serial.print(i);
+     Serial.print("] = ");
+     Serial.println(parameterKnobValues[i]);
   }
   // read parameterTogglePins
   for (int i = 0; i < 4; i++) {
     parameterToggleValues[i] = digitalRead(parameterTogglePins[i]);
-    // Serial.print("parameterToggleValues[");
-    // Serial.print(i);
-    // Serial.print("] = ");
-    // Serial.println(parameterToggleValues[i]);
+     Serial.print("parameterToggleValues[");
+     Serial.print(i);
+     Serial.print("] = ");
+     Serial.println(parameterToggleValues[i]);
   }
   // read motorKnobPins 
   for (int i = 0; i < 12; i++) {
     motorKnobValues[i] =  map(analogRead(motorKnobPins[i]), 0, 1023, 0, 255);
-    // Serial.print("motorKnobValues[");
-    // Serial.print(i);
-    // Serial.print("] = ");
-    // Serial.println(motorKnobValues[i]);
+     Serial.print("motorKnobValues[");
+     Serial.print(i);
+     Serial.print("] = ");
+     Serial.println(motorKnobValues[i]);
   }
   // read motorTogglePins 
   for (int i = 0; i < 12; i++) {
     motorToggleValues[i] = digitalRead(motorTogglePins[i]);
-    // Serial.print("motorToggleValues[");
-    // Serial.print(i);
-    // Serial.print("] = ");
-    // Serial.println(motorToggleValues[i]);
+     Serial.print("motorToggleValues[");
+     Serial.print(i);
+     Serial.print("] = ");
+     Serial.println(motorToggleValues[i]);
   }
 
   // evaluate and do
